@@ -72,6 +72,14 @@ report `TS2322` (a string type mismatch) and `TS6133` (an unused declaration).
 Both results remain review-needed compiler diagnostics, not confirmed bugs.
 The TypeScript adapter does not install target dependencies; unresolved imports
 produce an explicit partial scan.
+The analyzer health endpoint is available at `http://localhost:8000/health`.
+Copy `.env.example` to `apps/web/.env.local` and set
+`ANALYZER_BASE_URL=http://localhost:8000` for local service calls. On Vercel,
+the web service receives `ANALYZER_BASE_URL` from its private service binding
+to the analyzer. The web health proxy is available at `/api/analyzer/health`.
+The scan API remains `501 Not Implemented`: source checkout, validation,
+exclusions, deterministic analyzers, and scan persistence are not implemented.
+Configure credentials there only when implementing GitHub integration.
 
 ## Tests and checks
 
@@ -84,6 +92,16 @@ npm run build
 ```
 
 ## Phase 2 scope and limits
+Run the web-to-analyzer client tests from the repository root:
+
+```bash
+node --experimental-strip-types --test \
+  apps/web/lib/analyzer/client.test.mjs \
+  apps/web/lib/api/not-implemented.test.mjs
+```
+
+The initial source-language, exclusion, resource-limit, and threat-boundary
+policy is recorded in [docs/scope.md](docs/scope.md).
 
 - Source extensions: JavaScript, JSX, TypeScript, and TSX; JSON configuration
   files are discovered but not passed to the compiler.
