@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -28,11 +28,36 @@ class ScanStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
+    PARTIAL = "partial"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
 
+class ReviewStatus(StrEnum):
+    NEEDS_REVIEW = "needs_review"
+
+
+class VerificationStatus(StrEnum):
+    NOT_RUN = "not_run"
+
+
+class InspectionStatus(StrEnum):
+    INCLUDED = "included"
+    SKIPPED = "skipped"
+
+
+class AnalyzerStatus(StrEnum):
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    TIMED_OUT = "timed_out"
+    OUTPUT_LIMIT = "output_limit"
+    UNAVAILABLE = "unavailable"
+    SKIPPED = "skipped"
+
+
 NonEmptyText = Annotated[str, Field(min_length=1)]
+FixtureId = Literal["buggy-react-app", "clean-react-app"]
 
 
 class Finding(BaseModel):
@@ -52,6 +77,13 @@ class Finding(BaseModel):
     end_line: Annotated[int, Field(ge=1)]
     evidence: NonEmptyText
     explanation: str | None = None
+    description: str | None = None
+    fingerprint: Annotated[str, Field(min_length=64, max_length=64)] | None = None
+    analyzer: str | None = None
+    rule_id: str | None = None
+    confidence: Annotated[float, Field(ge=0, le=1)] | None = None
+    status: ReviewStatus = ReviewStatus.NEEDS_REVIEW
+    verification: VerificationStatus = VerificationStatus.NOT_RUN
 
     @model_validator(mode="after")
     def line_range_is_ordered(self) -> "Finding":
@@ -72,3 +104,61 @@ class ScanSummary(BaseModel):
     commit_sha: Annotated[str, Field(min_length=1, max_length=64)]
     status: ScanStatus
     created_at: datetime
+
+
+class AnalyzeRequest(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        extra="forbid",
+    )
+
+    fixture_id: FixtureId
+
+
+class FixtureDescriptor(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel)
+
+    id: FixtureId
+    name: NonEmptyText
+    description: NonEmptyText
+
+
+class FixtureListResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel)
+
+    fixtures: list[FixtureDescriptor]
+
+
+class FileInspection(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    path: NonEmptyText
+    status: InspectionStatus
+    reason: NonEmptyText
+    size_bytes: Annotated[int, Field(ge=0)] = 0
+
+
+class AnalyzerRun(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    name: NonEmptyText
+    version: str | None = None
+    status: AnalyzerStatus
+    message: NonEmptyText
+    files_analyzed: Annotated[int, Field(ge=0)] = 0
+    findings_count: Annotated[int, Field(ge=0)] = 0
+    duration_ms: Annotated[int, Field(ge=0)] = 0
+
+
+class AnalysisResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    id: UUID
+    fixture_id: NonEmptyText
+    status: ScanStatus
+    findings: list[Finding]
+    files: list[FileInspection]
+    analyzers: list[AnalyzerRun]
+    errors: list[str]
+    started_at: datetime
+    finished_at: datetime

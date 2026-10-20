@@ -6,7 +6,9 @@ in [scope.md](./scope.md). Treat repository contents as untrusted input, keep
 credentials server-side, and never execute scanned code with access to host
 secrets or the network.
 
-This initial scaffold does not yet implement authentication, GitHub access,
-scan isolation, or result storage. The documented scan limits and exclusions
-are not enforced yet. These controls must be implemented and tested before
-enabling repository scans for users.
+Phase 2 enforces path allowlisting, source-file exclusions, size/count/time
+limits, bounded compiler output, temporary source staging, and safe subprocess
+invocation for the local fixture workflow. It does not implement authentication,
+GitHub access, persistent storage, or production-grade multi-tenant isolation.
+Do not expose the local analyzer service to untrusted networks or use it to
+process user repositories until those controls are designed and tested.

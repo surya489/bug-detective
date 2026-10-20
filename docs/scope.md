@@ -1,8 +1,8 @@
 # Phase 0: scope and repository policy
 
-This document records the initial MVP boundary. Limits below are policy
-defaults to implement and validate in later scanning phases; they are not yet
-enforced by the scaffold.
+This document records the initial MVP boundary and the limits enforced by the
+local fixture analyzer. Repository checkout policy is future work because this
+phase does not clone or fetch repositories.
 
 ## Supported source languages
 
@@ -25,17 +25,23 @@ Do not send these paths or file types to analyzers:
 The scanner must apply exclusions before reading or uploading source content.
 Repository ignore rules do not override the secret and generated-file denylist.
 
-## Initial resource limits
+## Resource limits
 
-- Maximum checkout size: 100 MiB.
 - Maximum candidate source files: 10,000.
 - Maximum individual source file: 1 MiB.
 - Maximum total source content analyzed: 50 MiB.
-- Maximum scan duration: 5 minutes.
+- Maximum discovered filesystem entries: 50,000.
+- Maximum overall discovery and scan duration: 5 minutes.
+- Maximum analyzer execution duration: 30 seconds.
+- Maximum combined analyzer output: 1 MiB.
 - Maximum findings returned per scan: 1,000.
 
-Exceeding a limit must fail the scan with an explicit, user-visible reason; it
-must not silently truncate source content or report a successful partial scan.
+Exceeding a file, total-byte, entry-count, or overall-time discovery limit fails
+the scan with an explicit reason. Analyzer timeout, compiler output limit,
+unresolved imports, or finding-count limit are reported as partial when the
+service can return a truthful partial result. No limit is silently treated as
+a successful complete scan. Limits are configurable through `ANALYZER_MAX_*`
+service environment variables.
 
 ## Threat boundaries
 
@@ -65,6 +71,14 @@ extra fields, empty required text, and invalid line ranges are rejected.
 
 ## Current implementation status
 
-The repo skeleton and `.env.example` are present. Limits and exclusions are
-documented policy only; enforcement, source checkout, analyzers, and storage
-are future work.
+File exclusions, source size/count/total limits, filesystem-entry and elapsed
+time limits, compiler output limits, and the finding limit are implemented for
+the two allowlisted fixtures. A 100 MiB checkout limit is not implemented
+because there is no checkout flow. GitHub integration, persistence, and
+multi-tenant workspace isolation are future work.
+
+The analyzer invokes the TypeScript compiler version pinned by the npm
+lockfile. It does not resolve imports or read the repository tsconfig because
+doing so would require reading dependencies or configuration outside the
+staged allowlisted source. Unresolved import diagnostics therefore produce a
+partial scan rather than a fabricated finding.

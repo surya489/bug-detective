@@ -2,6 +2,7 @@ export type ScanStatus =
   | "queued"
   | "running"
   | "completed"
+  | "partial"
   | "failed"
   | "cancelled";
 
@@ -32,4 +33,53 @@ export interface Finding {
   endLine: number;
   evidence: string;
   explanation?: string | null;
+  description?: string | null;
+  fingerprint?: string | null;
+  analyzer?: string | null;
+  ruleId?: string | null;
+  confidence?: number | null;
+  status: "needs_review";
+  verification: "not_run";
+}
+
+export interface FixtureDescriptor {
+  id: "buggy-react-app" | "clean-react-app";
+  name: string;
+  description: string;
+}
+
+export interface FileInspection {
+  path: string;
+  status: "included" | "skipped";
+  reason: string;
+  sizeBytes: number;
+}
+
+export interface AnalyzerRun {
+  name: string;
+  version: string | null;
+  status:
+    | "completed"
+    | "partial"
+    | "failed"
+    | "timed_out"
+    | "output_limit"
+    | "unavailable"
+    | "skipped";
+  message: string;
+  filesAnalyzed: number;
+  findingsCount: number;
+  durationMs: number;
+}
+
+export interface AnalysisResponse {
+  id: string;
+  fixtureId: FixtureDescriptor["id"];
+  status: ScanStatus;
+  findings: Finding[];
+  files: FileInspection[];
+  analyzers: AnalyzerRun[];
+  errors: string[];
+  startedAt: string;
+  finishedAt: string;
 }
