@@ -9,6 +9,7 @@ const {
   safeGitHubError,
   validateRepositoryCommit,
 } = require("../lib/github/api.ts");
+const { fetchUserRepositories } = require("../lib/github/repositories.ts");
 const {
   createGitHubSession,
   createOAuthState,
@@ -38,6 +39,47 @@ function jsonResponse(data, status = 200, headers = {}) {
     headers: { "content-type": "application/json", ...headers },
   });
 }
+
+test("legacy repository listing fetches private repositories beyond the first page", async () => {
+  const originalFetch = global.fetch;
+  const requestedUrls = [];
+  const createRepository = (id, isPrivate = false) => ({
+    id,
+    name: `repository-${id}`,
+    full_name: `octocat/repository-${id}`,
+    owner: { login: "octocat", avatar_url: "https://example.com/avatar.png" },
+    description: null,
+    html_url: `https://github.com/octocat/repository-${id}`,
+    private: isPrivate,
+    default_branch: "main",
+    language: "TypeScript",
+    stargazers_count: 0,
+    forks_count: 0,
+    updated_at: "2026-10-20T00:00:00Z",
+  });
+  global.fetch = async (input) => {
+    const url = new URL(String(input));
+    requestedUrls.push(url);
+    const page = Number(url.searchParams.get("page"));
+    return jsonResponse(
+      page === 1
+        ? Array.from({ length: 100 }, (_, index) =>
+            createRepository(index + 1),
+          )
+        : [createRepository(101, true)],
+    );
+  };
+
+  try {
+    const repositories = await fetchUserRepositories("token");
+    assert.equal(requestedUrls.length, 2);
+    assert.equal(requestedUrls[1].searchParams.get("page"), "2");
+    assert.equal(repositories.length, 101);
+    assert.equal(repositories[100].isPrivate, true);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
 
 function configureSessionKey() {
   process.env.GITHUB_SESSION_SECRET = randomBytes(32).toString("base64url");

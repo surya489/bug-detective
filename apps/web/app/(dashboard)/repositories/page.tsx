@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
   ExternalLink,
@@ -59,6 +60,7 @@ function formatRelativeTime(dateString: string): string {
 function RepositoriesContent() {
   const searchParams = useSearchParams();
   const urlError = searchParams.get("error");
+  const shouldReduceMotion = useReducedMotion();
 
   const [session, setSession] = useState<SessionState | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -127,6 +129,7 @@ function RepositoriesContent() {
         };
         if (!controller.signal.aborted) {
           setRepositories(data.repositories);
+          console.log("data repositories", data);
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -148,15 +151,16 @@ function RepositoriesContent() {
     };
   }, [session?.authenticated]);
 
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredRepositories = useMemo(() => {
     return repositories.filter((repo) => {
       const matchesSearch =
-        searchQuery.trim().length === 0 ||
-        repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        normalizedSearchQuery.length === 0 ||
+        repo.name.toLowerCase().includes(normalizedSearchQuery) ||
         (repo.description ?? "")
           .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        (repo.language ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+          .includes(normalizedSearchQuery) ||
+        (repo.language ?? "").toLowerCase().includes(normalizedSearchQuery);
 
       const matchesFilter =
         filter === "all" ||
@@ -165,7 +169,7 @@ function RepositoriesContent() {
 
       return matchesSearch && matchesFilter;
     });
-  }, [repositories, searchQuery, filter]);
+  }, [repositories, normalizedSearchQuery, filter]);
 
   if (sessionLoading) {
     return (
@@ -298,9 +302,14 @@ function RepositoriesContent() {
 
   // Authenticated State: Repositories List
   return (
-    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-7xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">
       {/* User Header Profile */}
-      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-5 sm:flex-row sm:items-center">
+      <motion.section
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="flex min-w-0 flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-center"
+      >
         <div className="flex items-center gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -308,9 +317,9 @@ function RepositoriesContent() {
             alt={session.user?.login ?? "User"}
             className="size-12 rounded-xl border border-border object-cover shadow-sm"
           />
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-foreground">
+              <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-foreground">
                 {session.user?.name || session.user?.login}
               </h1>
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
@@ -325,7 +334,7 @@ function RepositoriesContent() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <a
             href={session.user?.htmlUrl}
             target="_blank"
@@ -337,36 +346,38 @@ function RepositoriesContent() {
             <ExternalLink className="size-3 text-muted-foreground" />
           </a>
         </div>
-      </div>
+      </motion.section>
 
       {/* Search & Filter Bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="relative w-full min-w-0 md:max-w-md md:flex-1">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search repositories by name, language, or topic..."
+            placeholder="Search repositories..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-border bg-card py-2 pl-9 pr-8 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            aria-label="Search repositories by name, language, or description"
+            className="h-11 w-full rounded-xl border border-border bg-card py-2 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Clear repository search"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="size-3.5" />
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-border bg-card p-0.5 text-xs">
+        <div className="flex w-full items-center gap-2 md:w-auto">
+          <div className="grid min-w-0 flex-1 grid-cols-3 rounded-xl border border-border bg-card p-1 text-xs md:flex md:flex-none">
             <button
               type="button"
               onClick={() => setFilter("all")}
-              className={`rounded-md px-2.5 py-1.5 font-medium transition-colors ${filter === "all"
+              className={`min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors sm:px-2.5 sm:text-xs ${filter === "all"
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -376,7 +387,7 @@ function RepositoriesContent() {
             <button
               type="button"
               onClick={() => setFilter("public")}
-              className={`rounded-md px-2.5 py-1.5 font-medium transition-colors ${filter === "public"
+              className={`min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors sm:px-2.5 sm:text-xs ${filter === "public"
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -386,7 +397,7 @@ function RepositoriesContent() {
             <button
               type="button"
               onClick={() => setFilter("private")}
-              className={`rounded-md px-2.5 py-1.5 font-medium transition-colors ${filter === "private"
+              className={`min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors sm:px-2.5 sm:text-xs ${filter === "private"
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -402,7 +413,8 @@ function RepositoriesContent() {
             }}
             disabled={reposLoading}
             title="Refresh repository list"
-            className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+            aria-label="Refresh repository list"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 md:size-10"
           >
             <RefreshCw
               className={`size-3.5 ${reposLoading ? "animate-spin" : ""}`}
@@ -421,7 +433,7 @@ function RepositoriesContent() {
 
       {/* Repositories Grid */}
       {reposLoading && repositories.length === 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
@@ -433,42 +445,52 @@ function RepositoriesContent() {
         <div className="rounded-2xl border border-dashed border-border py-12 text-center">
           <FolderGit2 className="mx-auto size-10 text-muted-foreground/60" />
           <h2 className="mt-3 text-sm font-semibold text-foreground">
-            {searchQuery
+            {normalizedSearchQuery
               ? "No matching repositories found"
               : "No repositories discovered"}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            {searchQuery
+            {normalizedSearchQuery
               ? `No repositories matched "${searchQuery}". Try adjusting your search or filters.`
               : "Your connected GitHub account doesn't seem to have repositories in this category."}
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredRepositories.map((repo) => {
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <AnimatePresence initial={false} mode="popLayout">
+          {filteredRepositories.map((repo, index) => {
             const langColor = repo.language
               ? LANGUAGE_COLORS[repo.language] || "#888888"
               : null;
 
             return (
-              <div
+              <motion.article
                 key={repo.id}
-                className="group relative flex flex-col justify-between rounded-2xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5"
+                layout={!shouldReduceMotion}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={shouldReduceMotion ? undefined : { opacity: 0, y: 8 }}
+                transition={{
+                  duration: shouldReduceMotion ? 0 : 0.22,
+                  delay: shouldReduceMotion ? 0 : Math.min(index * 0.035, 0.28),
+                }}
+                whileHover={shouldReduceMotion ? undefined : { y: -3 }}
+                className="group relative flex min-h-[190px] min-w-0 flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 sm:p-5"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
                     <a
                       href={repo.htmlUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group/link flex items-center gap-1.5 font-semibold text-foreground transition-colors hover:text-primary"
+                      className="group/link flex min-w-0 flex-1 items-center gap-1.5 font-semibold text-foreground transition-colors hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
-                      <span className="truncate">{repo.name}</span>
-                      <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-100" />
+                      <span className="truncate text-[15px] sm:text-base">{repo.name}</span>
+                      <ExternalLink className="size-3 shrink-0 opacity-0 transition-opacity group-hover/link:opacity-100 group-focus-visible/link:opacity-100" />
                     </a>
 
                     <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${repo.isPrivate
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium ${repo.isPrivate
                         ? "border border-amber-500/30 bg-amber-500/10 text-amber-300"
                         : "border border-border bg-muted/60 text-muted-foreground"
                         }`}
@@ -487,21 +509,21 @@ function RepositoriesContent() {
                     </span>
                   </div>
 
-                  <p className="mt-2 line-clamp-2 min-h-[32px] text-xs leading-5 text-muted-foreground">
+                  <p className="mt-3 line-clamp-2 min-h-10 break-words text-xs leading-5 text-muted-foreground">
                     {repo.description || "No description provided."}
                   </p>
                 </div>
 
-                <div className="mt-5 border-t border-border/60 pt-3">
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <div className="flex items-center gap-3">
+                <div className="mt-5 border-t border-border/60 pt-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-[11px] text-muted-foreground">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
                       {repo.language && (
-                        <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-flex max-w-full items-center gap-1.5">
                           <span
-                            className="size-2 rounded-full"
+                            className="size-2 shrink-0 rounded-full"
                             style={{ backgroundColor: langColor || "#888" }}
                           />
-                          <span>{repo.language}</span>
+                          <span className="truncate">{repo.language}</span>
                         </span>
                       )}
 
@@ -520,12 +542,13 @@ function RepositoriesContent() {
                       )}
                     </div>
 
-                    <span>{formatRelativeTime(repo.updatedAt)}</span>
+                    <span className="shrink-0">{formatRelativeTime(repo.updatedAt)}</span>
                   </div>
                 </div>
-              </div>
+              </motion.article>
             );
           })}
+          </AnimatePresence>
         </div>
       )}
     </main>
@@ -538,7 +561,7 @@ export default function RepositoriesPage() {
       fallback={
         <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
           <div className="h-10 w-48 animate-pulse rounded-lg bg-muted/40" />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}

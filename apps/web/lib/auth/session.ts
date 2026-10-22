@@ -23,7 +23,6 @@ function getSecretKey(): string {
   return (
     process.env.SESSION_SECRET ||
     process.env.GITHUB_CLIENT_SECRET ||
-    process.env.AUTH_GITHUB_SECRET ||
     "bug-detective-local-secret-key-32-chars-long!"
   );
 }
