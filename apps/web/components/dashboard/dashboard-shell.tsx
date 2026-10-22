@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { GitHubUserNav } from "@/components/dashboard/github-user-nav";
 
 const navigation = [
   { href: "/", label: "Dashboard", available: true },
@@ -23,16 +24,24 @@ function AnalyzerHealth() {
   const [online, setOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
-    let active = true;
-    fetch("/api/analyzer/health", { cache: "no-store" })
+    const controller = new AbortController();
+
+    fetch("/api/analyzer/health", {
+      cache: "no-store",
+      signal: controller.signal,
+    })
       .then((response) => {
-        if (active) setOnline(response.ok);
+        setOnline(response.ok);
       })
       .catch(() => {
-        if (active) setOnline(false);
+        if (controller.signal.aborted) {
+          return;
+        }
+        setOnline(false);
       });
+
     return () => {
-      active = false;
+      controller.abort();
     };
   }, []);
 
@@ -40,13 +49,12 @@ function AnalyzerHealth() {
     <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
       <span
         aria-hidden="true"
-        className={`size-2 rounded-full ${
-          online === null
-            ? "bg-muted-foreground"
-            : online
-              ? "bg-emerald-400"
-              : "bg-amber-400"
-        }`}
+        className={`size-2 rounded-full ${online === null
+          ? "bg-muted-foreground"
+          : online
+            ? "bg-emerald-400"
+            : "bg-amber-400"
+          }`}
       />
       {online === null
         ? "Checking analyzer"
@@ -89,11 +97,10 @@ export default function DashboardShell({
                 key={item.label}
                 href={item.href}
                 aria-current={pathname === item.href ? "page" : undefined}
-                className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  pathname === item.href
-                    ? "bg-primary/10 font-medium text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                }`}
+                className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === item.href
+                  ? "bg-primary/10 font-medium text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
               >
                 {item.label}
               </Link>
@@ -129,7 +136,10 @@ export default function DashboardShell({
                 Bug Detective <span className="px-1 text-border">/</span> {title}
               </p>
             </div>
-            <AnalyzerHealth />
+            <div className="flex items-center gap-2.5">
+              <AnalyzerHealth />
+              <GitHubUserNav />
+            </div>
           </div>
           <nav
             aria-label="Mobile navigation"
@@ -141,11 +151,10 @@ export default function DashboardShell({
                   key={item.label}
                   href={item.href}
                   aria-current={pathname === item.href ? "page" : undefined}
-                  className={`shrink-0 rounded-md px-3 py-2 text-xs ${
-                    pathname === item.href
-                      ? "bg-primary/10 font-medium text-primary"
-                      : "text-muted-foreground"
-                  }`}
+                  className={`shrink-0 rounded-md px-3 py-2 text-xs ${pathname === item.href
+                    ? "bg-primary/10 font-medium text-primary"
+                    : "text-muted-foreground"
+                    }`}
                 >
                   {item.label}
                 </Link>

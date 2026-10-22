@@ -50,14 +50,22 @@ export default function DashboardOverview() {
   const [severity, setSeverity] = useState("all");
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
+
     async function loadFixtures() {
       try {
         const [healthResponse, fixturesResponse] = await Promise.all([
-          fetch("/api/analyzer/health", { cache: "no-store" }),
-          fetch("/api/analyzer/fixtures", { cache: "no-store" }),
+          fetch("/api/analyzer/health", {
+            cache: "no-store",
+            signal: controller.signal,
+          }),
+          fetch("/api/analyzer/fixtures", {
+            cache: "no-store",
+            signal: controller.signal,
+          }),
         ]);
-        if (!active) return;
+
+        if (controller.signal.aborted) return;
         setServiceOnline(healthResponse.ok);
         if (!healthResponse.ok) {
           const healthBody: unknown = await healthResponse.json();
@@ -74,11 +82,11 @@ export default function DashboardOverview() {
         const fixtureBody = (await fixturesResponse.json()) as {
           fixtures: FixtureDescriptor[];
         };
-        if (!active) return;
+        if (controller.signal.aborted) return;
         setFixtures(fixtureBody.fixtures);
         setLoadState("ready");
       } catch (error) {
-        if (!active) return;
+        if (controller.signal.aborted) return;
         setServiceOnline(false);
         setLoadState("error");
         setLoadingMessage(
@@ -90,7 +98,7 @@ export default function DashboardOverview() {
     }
     void loadFixtures();
     return () => {
-      active = false;
+      controller.abort();
     };
   }, []);
 
@@ -210,11 +218,10 @@ export default function DashboardOverview() {
               </p>
             </div>
             <span
-              className={`rounded-full px-2.5 py-1 text-[11px] ${
-                serviceOnline
+              className={`rounded-full px-2.5 py-1 text-[11px] ${serviceOnline
                   ? "bg-emerald-400/10 text-emerald-300"
                   : "bg-amber-400/10 text-amber-300"
-              }`}
+                }`}
             >
               {serviceOnline ? "Service ready" : "Service unavailable"}
             </span>
@@ -298,11 +305,10 @@ export default function DashboardOverview() {
               <div className="flex items-center justify-between gap-3">
                 <span className="font-mono text-sm">{analyzer.name}</span>
                 <span
-                  className={`text-xs ${
-                    analyzer.status === "completed"
-                      ? "text-emerald-300"
-                      : "text-amber-300"
-                  }`}
+                  className={`text-xs ${analyzer.status === "completed"
+                    ? "text-emerald-300"
+                    : "text-amber-300"
+                    }`}
                 >
                   {analyzer.status.replaceAll("_", " ")}
                 </span>
