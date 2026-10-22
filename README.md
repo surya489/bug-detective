@@ -127,6 +127,19 @@ The dashboard continues to offer the `buggy-react-app` and `clean-react-app`
 fixtures. The buggy fixture is expected to report `TS2322` (a type mismatch)
 and `TS6133` (an unused declaration). Findings are compiler evidence for review,
 not confirmed defects.
+Use `clean-react-app` for the clean fixture. The buggy fixture is expected to
+report `TS2322` (a string type mismatch) and `TS6133` (an unused declaration).
+Both results remain review-needed compiler diagnostics, not confirmed bugs.
+The TypeScript adapter does not install target dependencies; unresolved imports
+produce an explicit partial scan.
+The analyzer health endpoint is available at `http://localhost:8000/health`.
+Copy `.env.example` to `apps/web/.env.local` and set
+`ANALYZER_BASE_URL=http://localhost:8000` for local service calls. On Vercel,
+the web service receives `ANALYZER_BASE_URL` from its private service binding
+to the analyzer. The web health proxy is available at `/api/analyzer/health`.
+The scan API remains `501 Not Implemented`: source checkout, validation,
+exclusions, deterministic analyzers, and scan persistence are not implemented.
+Configure credentials there only when implementing GitHub integration.
 
 ## Tests and checks
 
@@ -141,6 +154,17 @@ npm run build
 
 GitHub API, session, source filtering, and route tests use mocked responses and
 do not require a real GitHub account or credentials.
+## Phase 2 scope and limits
+Run the web-to-analyzer client tests from the repository root:
+
+```bash
+node --experimental-strip-types --test \
+  apps/web/lib/analyzer/client.test.mjs \
+  apps/web/lib/api/not-implemented.test.mjs
+```
+
+The initial source-language, exclusion, resource-limit, and threat-boundary
+policy is recorded in [docs/scope.md](docs/scope.md).
 
 ## Security limits and known limitations
 
