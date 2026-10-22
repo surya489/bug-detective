@@ -6,7 +6,7 @@ import hashlib
 import tempfile
 import time
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import UUID, uuid4, uuid5
 
 from app.analyzers.base import AnalyzerAdapter, Diagnostic
@@ -15,6 +15,8 @@ from app.schemas import (
     AnalysisResponse,
     AnalyzerRun,
     AnalyzerStatus,
+    FileInspection,
+    InspectionStatus,
     Finding,
     FindingCategory,
     FindingSeverity,
@@ -25,7 +27,10 @@ from app.schemas import (
 from app.services.discovery import (
     DiscoveryError,
     DiscoveryLimits,
+    IGNORED_DIRECTORIES,
+    _skip_reason,
     discover_files,
+    SourceFile,
 )
 
 FINDING_NAMESPACE = UUID("27bd203d-390d-4abe-b049-f00403dfd922")
@@ -143,11 +148,34 @@ def analyze_fixture(
             finishedAt=finished_at,
         )
 
+    return _analyze_discovery(
+        discovery.sources,
+        discovery.inspections,
+        scan_id=scan_id,
+        limits=selected_limits,
+        started_at=started_at,
+        started_clock=started_clock,
+        adapter=adapter,
+    )
+
+
+def _analyze_discovery(
+    sources: tuple[SourceFile, ...],
+    inspections: tuple[FileInspection, ...],
+    *,
+    scan_id: UUID,
+    limits: DiscoveryLimits,
+    started_at: datetime,
+    started_clock: float,
+    adapter: AnalyzerAdapter | None,
+    repository_full_name: str | None = None,
+    commit_sha: str | None = None,
+) -> AnalysisResponse:
     findings: list[Finding] = []
     analyzer_runs: list[AnalyzerRun] = []
     source_paths = tuple(
         source.relative_path
-        for source in discovery.sources
+        for source in sources
         if Path(source.relative_path).suffix.lower()
         in {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"}
     )
@@ -164,13 +192,11 @@ def analyze_fixture(
         try:
             with tempfile.TemporaryDirectory(prefix="bug-detective-") as staging:
                 staging_root = Path(staging)
-                for source in discovery.sources:
+                for source in sources:
                     target = staging_root / source.relative_path
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(source.content)
-                remaining = selected_limits.max_scan_seconds - (
-                    time.monotonic() - started_clock
-                )
+                remaining = limits.max_scan_seconds - (time.monotonic() - started_clock)
                 if remaining <= 0:
                     analyzer_run = AnalyzerRun(
                         name=selected_adapter.name,
@@ -183,7 +209,7 @@ def analyze_fixture(
                         selected_adapter,
                         staging,
                         source_paths,
-                        min(selected_limits.max_analyzer_seconds, remaining),
+                        min(limits.max_analyzer_seconds, remaining),
                     )
                 analyzer_runs.append(analyzer_run)
                 if analyzer_run.status in {
@@ -193,11 +219,11 @@ def analyze_fixture(
                     findings = [
                         normalize_finding(item, scan_id) for item in diagnostics
                     ]
-                    if len(findings) > selected_limits.max_findings:
-                        findings = findings[: selected_limits.max_findings]
+                    if len(findings) > limits.max_findings:
+                        findings = findings[: limits.max_findings]
                         analyzer_run.status = AnalyzerStatus.PARTIAL
                         analyzer_run.message = (
-                            f"Results were limited to {selected_limits.max_findings} findings; "
+                            f"Results were limited to {limits.max_findings} findings; "
                             "this scan may be incomplete."
                         )
         except (OSError, RuntimeError):
@@ -224,12 +250,129 @@ def analyze_fixture(
     finished_at = datetime.now(UTC)
     return AnalysisResponse(
         id=scan_id,
-        fixtureId=fixture_id,
+        fixtureId=f"github:{repository_full_name}" if repository_full_name else "local",
         status=scan_status,
         findings=findings,
-        files=list(discovery.inspections),
+        files=list(inspections),
         analyzers=analyzer_runs,
         errors=errors,
         startedAt=started_at,
         finishedAt=finished_at,
+        repositoryFullName=repository_full_name,
+        commitSha=commit_sha,
+    )
+
+
+def analyze_sources(
+    repository_full_name: str,
+    commit_sha: str,
+    files: list[tuple[str, str]],
+    *,
+    limits: DiscoveryLimits | None = None,
+    adapter: AnalyzerAdapter | None = None,
+) -> AnalysisResponse:
+    started_at = datetime.now(UTC)
+    started_clock = time.monotonic()
+    scan_id = uuid4()
+    selected_limits = limits or DiscoveryLimits.from_environment()
+    source_files: list[SourceFile] = []
+    inspections: list[FileInspection] = []
+    seen_paths: set[str] = set()
+    total_bytes = 0
+
+    try:
+        for relative_path, text in files:
+            pure_path = PurePosixPath(relative_path)
+            if (
+                "\\" in relative_path
+                or pure_path.is_absolute()
+                or not pure_path.parts
+                or pure_path.as_posix() != relative_path
+                or any(part in {"", ".", ".."} for part in pure_path.parts)
+                or any(":" in part for part in pure_path.parts)
+                or any(ord(char) < 32 or ord(char) == 127 for char in relative_path)
+            ):
+                raise ValueError("A source path is not a safe relative path.")
+            canonical_path = pure_path.as_posix()
+            if canonical_path in seen_paths:
+                raise ValueError("The source request contains duplicate file paths.")
+            seen_paths.add(canonical_path)
+            path = Path(*pure_path.parts)
+            reason = _skip_reason(path)
+            if reason is None and any(
+                part.lower() in IGNORED_DIRECTORIES for part in pure_path.parts[:-1]
+            ):
+                reason = "generated_or_dependency_directory"
+            if reason is not None:
+                inspections.append(
+                    FileInspection(
+                        path=canonical_path,
+                        status=InspectionStatus.SKIPPED,
+                        reason=reason,
+                    )
+                )
+                continue
+
+            try:
+                content = text.encode("utf-8", errors="strict")
+            except UnicodeEncodeError as exc:
+                raise ValueError("A source file is not valid UTF-8 text.") from exc
+            if b"\0" in content:
+                inspections.append(
+                    FileInspection(
+                        path=canonical_path,
+                        status=InspectionStatus.SKIPPED,
+                        reason="binary_file",
+                        sizeBytes=len(content),
+                    )
+                )
+                continue
+            if len(content) > selected_limits.max_file_bytes:
+                raise ValueError("A source file exceeds the configured file limit.")
+            if len(source_files) >= selected_limits.max_files:
+                raise ValueError("The source request exceeds the configured file limit.")
+            total_bytes += len(content)
+            if total_bytes > selected_limits.max_total_bytes:
+                raise ValueError("The source request exceeds the configured total size limit.")
+            source_files.append(SourceFile(canonical_path, content))
+            inspections.append(
+                FileInspection(
+                    path=canonical_path,
+                    status=InspectionStatus.INCLUDED,
+                    reason="supported_source_or_configuration",
+                    sizeBytes=len(content),
+                )
+            )
+    except ValueError as exc:
+        finished_at = datetime.now(UTC)
+        return AnalysisResponse(
+            id=scan_id,
+            fixtureId=f"github:{repository_full_name}",
+            status=ScanStatus.FAILED,
+            findings=[],
+            files=inspections,
+            analyzers=[
+                AnalyzerRun(
+                    name="discovery",
+                    status=AnalyzerStatus.FAILED,
+                    message=str(exc),
+                )
+            ],
+            errors=[str(exc)],
+            startedAt=started_at,
+            finishedAt=finished_at,
+            repositoryFullName=repository_full_name,
+            commitSha=commit_sha,
+        )
+
+    return _analyze_discovery(
+        tuple(source_files),
+        tuple(inspections),
+        scan_id=scan_id,
+        limits=selected_limits,
+        started_at=started_at,
+        started_clock=started_clock,
+        adapter=adapter,
+        repository_full_name=repository_full_name,
+        commit_sha=commit_sha,
     )

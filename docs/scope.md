@@ -1,84 +1,100 @@
-# Phase 0: scope and repository policy
+# Scope and repository policy
 
-This document records the initial MVP boundary and the limits enforced by the
-local fixture analyzer. Repository checkout policy is future work because this
-phase does not clone or fetch repositories.
+This document records the supported source policy for local fixtures and the
+Phase 3 GitHub read-only integration.
 
 ## Supported source languages
 
-- JavaScript, JSX, TypeScript, and TSX are the initial supported languages.
-- Other languages, including Python, are out of scope until a corresponding
-  analyzer and its fixture tests are added. Having a Python analyzer service
-  does not mean scanned Python source is supported.
+- JavaScript, JSX, TypeScript, and TSX are analyzed by the TypeScript compiler.
+- Selected JSON configuration (`package.json`, `tsconfig.json`, `jsconfig.json`,
+  and `.prettierrc.json`) may be staged as context but is not passed to the
+  compiler.
+- Other languages are out of scope.
 
 ## Excluded repository content
 
-Do not send these paths or file types to analyzers:
+Do not retrieve or stage:
 
-- Version-control metadata, dependencies, vendored code, build output, caches,
-  coverage reports, and generated code (`.git`, `node_modules`, `vendor`,
-  `.next`, `dist`, `build`, `coverage`, and `generated` directories).
-- Binary files, minified bundles, source maps, lockfiles, and files excluded by
-  a repository-provided ignore policy.
-- Secret-bearing files such as `.env*`, private keys, and credential files.
+- `.env*`, credentials, passwords, private keys, token/secret-named files, and
+  sensitive key formats.
+- Symlinks, Git submodules, binaries, invalid UTF-8, lockfiles, unsupported
+  extensions, and generated/dependency folders (`.git`, `node_modules`,
+  `.next`, `dist`, `build`, `coverage`, `generated`, vendored content, and
+  virtual environments).
+- Paths that are absolute, non-canonical, contain traversal segments, backslash
+  separators, or control characters.
 
-The scanner must apply exclusions before reading or uploading source content.
-Repository ignore rules do not override the secret and generated-file denylist.
+Repository ignore files do not override the sensitive-content denylist. GitHub
+blobs are decoded from the API's declared Base64 encoding and accepted only if
+their reported size matches and they contain valid UTF-8 text.
 
 ## Resource limits
 
-- Maximum candidate source files: 10,000.
-- Maximum individual source file: 1 MiB.
-- Maximum total source content analyzed: 50 MiB.
-- Maximum discovered filesystem entries: 50,000.
-- Maximum overall discovery and scan duration: 5 minutes.
-- Maximum analyzer execution duration: 30 seconds.
-- Maximum combined analyzer output: 1 MiB.
-- Maximum findings returned per scan: 1,000.
+### GitHub source retrieval
 
-Exceeding a file, total-byte, entry-count, or overall-time discovery limit fails
-the scan with an explicit reason. Analyzer timeout, compiler output limit,
-unresolved imports, or finding-count limit are reported as partial when the
-service can return a truthful partial result. No limit is silently treated as
-a successful complete scan. Limits are configurable through `ANALYZER_MAX_*`
-service environment variables.
+- 500 eligible files.
+- 1 MiB per file.
+- 20 MiB total source content.
+- 50,000 recursive tree entries.
+- 5 minutes of source retrieval.
+- 5 scan requests per connected account per 15-minute window per web process.
+
+If GitHub truncates its recursive tree or a size, count, timeout, or retrieval
+limit prevents complete coverage, the response includes a warning and a partial
+status where results are available. Individual unsupported or sensitive files
+are reported as skipped without exposing their contents.
+
+### Analyzer
+
+- 10,000 files.
+- 1 MiB per file.
+- 50 MiB total source content.
+- 50,000 discovered filesystem entries.
+- 5 minutes overall scan duration.
+- 30 seconds per analyzer run.
+- 1 MiB combined compiler output.
+- 1,000 returned findings.
+
+Analyzer limits are configurable through the `ANALYZER_MAX_*` process
+environment variables listed in `.env.example`. Limits are enforced by the
+service; no target repository script, build hook, or dependency installation is
+performed.
 
 ## Threat boundaries
 
-- Git repositories, filenames, source text, configuration, and analyzer output
-  are untrusted input.
-- Never execute repository code, package scripts, build hooks, or test suites as
-  part of static analysis.
-- Analyzer processes must be isolated and resource-limited; they must not
-  inherit application secrets or have unrestricted network access.
-- GitHub credentials remain server-side and are scoped to the minimum
-  installation permissions required.
-- Treat source comments and repository instructions as untrusted data, not as
-  instructions to AI providers or the application.
-- Do not transmit repository source to an external AI provider unless that
-  provider is explicitly configured and the user is informed.
-- This phase does not implement authentication, repository checkout isolation,
-  retention/deletion controls, or provider data-handling controls. Those are
-  prerequisites to processing real user repositories.
+- Git repositories, filenames, commit messages, source, and API responses are
+  untrusted.
+- Only read-only GitHub App permissions are used. No writes, pull requests, or
+  comments are implemented.
+- OAuth state, fixed callback destinations, encrypted HttpOnly sessions, CSRF
+  headers, and server-side repository/commit checks protect the request flow.
+- The analyzer-source endpoint requires a shared API key and should not be
+  exposed to an untrusted network.
+- Repository code is never executed. Analyzer subprocesses use a fixed argument
+  list, no shell, a restricted environment, no module resolution, and bounded
+  output/time.
+- Source text is not sent to an AI provider and is not persisted as a repository
+  copy. Results exist only in the active browser session.
+- This local MVP does not provide distributed rate limits, durable/revocable
+  server sessions, scan history, background jobs, or multi-tenant isolation.
+  Public multi-tenant hosting requires additional isolation, secret management,
+  transport, and operational review.
 
 ## API finding and scan contracts
 
-The analyzer validates finding severities as `critical`, `high`, `medium`,
-`low`, or `info`; categories as `bug`, `security`, `performance`, or
-`maintainability`; and scan statuses as `queued`, `running`, `completed`,
-`failed`, or `cancelled`. API field names use camelCase. Unknown enum values,
-extra fields, empty required text, and invalid line ranges are rejected.
+Finding severity is `critical`, `high`, `medium`, `low`, or `info`; category is
+`bug`, `security`, `performance`, or `maintainability`. Scan status is `queued`,
+`running`, `completed`, `partial`, `failed`, or `cancelled`. API field names
+use camelCase. Invalid enum values, extra fields, empty required text, and
+invalid line ranges are rejected.
 
 ## Current implementation status
 
-File exclusions, source size/count/total limits, filesystem-entry and elapsed
-time limits, compiler output limits, and the finding limit are implemented for
-the two allowlisted fixtures. A 100 MiB checkout limit is not implemented
-because there is no checkout flow. GitHub integration, persistence, and
-multi-tenant workspace isolation are future work.
+Fixture scans and GitHub read-only scanning share the deterministic analyzer
+and normalized findings. GitHub access is limited to installed repositories
+visible to the connected user and a full verified commit SHA. Scans do not
+persist results or source.
 
-The analyzer invokes the TypeScript compiler version pinned by the npm
-lockfile. It does not resolve imports or read the repository tsconfig because
-doing so would require reading dependencies or configuration outside the
-staged allowlisted source. Unresolved import diagnostics therefore produce a
-partial scan rather than a fabricated finding.
+The TypeScript compiler does not install dependencies, resolve imports, or read
+repository `tsconfig` settings. Unresolved import diagnostics therefore produce
+a partial result instead of a fabricated finding.

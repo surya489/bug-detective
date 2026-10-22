@@ -23,6 +23,14 @@
 # misc
 .DS_Store
 *.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+**/credentials
+**/credentials.*
+**/private-key*
+**/.bug-detective-workspaces/
 
 # debug
 npm-debug.log*

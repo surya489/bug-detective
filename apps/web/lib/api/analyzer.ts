@@ -4,12 +4,13 @@ const analyzerBaseUrl =
 export async function requestAnalyzer(
   path: string,
   init?: RequestInit,
+  timeoutMs = 5_000,
 ): Promise<Response> {
   try {
     return await fetch(`${analyzerBaseUrl}${path}`, {
       ...init,
       cache: "no-store",
-      signal: AbortSignal.timeout(5_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     return Response.json(

@@ -155,12 +155,14 @@ def _is_reparse_point(info: os.stat_result) -> bool:
 
 def _skip_reason(path: Path) -> str | None:
     name = path.name.lower()
-    if name.startswith(".env"):
+    path_parts = tuple(part.lower() for part in path.parts)
+    if any(part.startswith(".env") for part in path_parts):
         return "sensitive_environment_file"
     if name in LOCKFILE_NAMES or path.suffix.lower() == ".lock":
         return "lockfile"
-    if name in SENSITIVE_NAMES or any(
-        marker in name
+    if any(part in SENSITIVE_NAMES for part in path_parts) or any(
+        marker in part
+        for part in path_parts
         for marker in ("credential", "password", "private_key", "secret", "token")
     ):
         return "sensitive_file"
@@ -170,6 +172,8 @@ def _skip_reason(path: Path) -> str | None:
         return "unsupported_file_type"
     if path.suffix.lower() == ".json" and name not in SAFE_JSON_CONFIG_NAMES:
         return "unsupported_file_type"
+    if name.endswith((".min.js", ".min.jsx", ".min.ts", ".min.tsx", ".min.mjs", ".min.cjs", ".min.mts", ".min.cts")):
+        return "generated_or_minified_file"
     return None
 
 
@@ -221,6 +225,15 @@ def discover_files(
                         ),
                     ),
                 )
+            if name.lower().startswith(".env"):
+                inspections.append(
+                    FileInspection(
+                        path=relative,
+                        status=InspectionStatus.SKIPPED,
+                        reason="sensitive_environment_file",
+                    )
+                )
+                continue
             if name.lower() in IGNORED_DIRECTORIES:
                 inspections.append(
                     FileInspection(
@@ -275,7 +288,7 @@ def discover_files(
                     ),
                 )
 
-            reason = _skip_reason(path)
+            reason = _skip_reason(Path(relative))
             if reason is not None:
                 inspections.append(
                     FileInspection(

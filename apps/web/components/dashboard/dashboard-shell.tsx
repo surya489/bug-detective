@@ -112,10 +112,10 @@ export default function DashboardShell({
         </nav>
 
         <div className="mt-auto rounded-xl border border-border bg-background p-4">
-          <p className="text-xs font-medium text-foreground">Phase 2 preview</p>
+          <p className="text-xs font-medium text-foreground">Read-only analysis</p>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            Scans run only against the two local fixtures. GitHub repositories
-            are not connected.
+            Scan a local fixture or connect an installed GitHub App to analyze
+            an immutable repository commit.
           </p>
         </div>
       </aside>

@@ -48,6 +48,31 @@ export interface FixtureDescriptor {
   description: string;
 }
 
+export interface GitHubRepository {
+  id: number;
+  name: string;
+  fullName: string;
+  owner: string;
+  description: string | null;
+  defaultBranch: string | null;
+  visibility: "public" | "private" | "internal";
+  updatedAt: string | null;
+}
+
+export interface GitHubCommit {
+  sha: string;
+  message: string;
+  author: string | null;
+  date: string | null;
+}
+
+export interface GitHubSessionState {
+  configured: boolean;
+  connected: boolean;
+  login: string | null;
+  csrfToken: string | null;
+}
+
 export interface FileInspection {
   path: string;
   status: "included" | "skipped";
@@ -74,7 +99,9 @@ export interface AnalyzerRun {
 
 export interface AnalysisResponse {
   id: string;
-  fixtureId: FixtureDescriptor["id"];
+  fixtureId: string;
+  repositoryFullName?: string | null;
+  commitSha?: string | null;
   status: ScanStatus;
   findings: Finding[];
   files: FileInspection[];

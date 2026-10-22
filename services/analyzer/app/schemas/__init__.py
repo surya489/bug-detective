@@ -115,6 +115,27 @@ class AnalyzeRequest(BaseModel):
     fixture_id: FixtureId
 
 
+class SourceFileInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: Annotated[str, Field(min_length=1, max_length=1024)]
+    content: str
+
+
+class AnalyzeSourcesRequest(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        extra="forbid",
+    )
+
+    repository_full_name: Annotated[
+        str,
+        Field(pattern=r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"),
+    ]
+    commit_sha: Annotated[str, Field(pattern=r"^[0-9a-fA-F]{40}$")]
+    files: Annotated[list[SourceFileInput], Field(max_length=10_000)]
+
+
 class FixtureDescriptor(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel)
 
@@ -162,3 +183,5 @@ class AnalysisResponse(BaseModel):
     errors: list[str]
     started_at: datetime
     finished_at: datetime
+    repository_full_name: str | None = None
+    commit_sha: Annotated[str, Field(pattern=r"^[0-9a-fA-F]{40}$")] | None = None
