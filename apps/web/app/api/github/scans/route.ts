@@ -149,7 +149,10 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           repositoryFullName: repository.fullName,
           commitSha: body.commitSha.toLowerCase(),
-          files: source.files,
+          files: source.files.map((file) => ({
+            path: file.path,
+            content: file.content,
+          })),
         }),
       },
       ANALYZER_TIMEOUT_MS,
@@ -191,9 +194,33 @@ export async function POST(request: Request) {
       );
     }
     const analysis = result as AnalysisResponse;
+
+    const diffMap = new Map<string, Set<number>>();
+    for (const f of source.files) {
+      if (f.changedLines && f.changedLines.length > 0) {
+        diffMap.set(f.path, new Set(f.changedLines));
+      }
+    }
+
+    const enrichedFindings = analysis.findings.map((finding) => {
+      const fileLines = diffMap.get(finding.filePath);
+      const isDiff =
+        fileLines !== undefined
+          ? fileLines.has(finding.startLine) ||
+            Array.from(fileLines).some(
+              (line) => line >= finding.startLine && line <= finding.endLine,
+            )
+          : null;
+      return {
+        ...finding,
+        inCommitDiff: isDiff,
+      };
+    });
+
     return githubJson(
       {
         ...analysis,
+        findings: enrichedFindings,
         files: [...analysis.files, ...source.inspections],
         errors: [...analysis.errors, ...source.warnings],
         status:

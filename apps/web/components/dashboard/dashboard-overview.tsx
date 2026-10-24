@@ -7,6 +7,8 @@ import type {
 } from "@bug-detective/shared-types";
 import { Button } from "@/components/ui/button";
 import FindingCard from "@/components/findings/finding-card";
+import { Pagination, SearchInput } from "@/components/ui";
+import { saveScan } from "@/lib/scans/scan-store";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -48,6 +50,8 @@ export default function DashboardOverview() {
   const [submitting, setSubmitting] = useState(false);
   const [query, setQuery] = useState("");
   const [severity, setSeverity] = useState("all");
+  const [findingsPage, setFindingsPage] = useState(1);
+  const [findingsPageSize, setFindingsPageSize] = useState(5);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -138,7 +142,9 @@ export default function DashboardOverview() {
       if (!response.ok) {
         throw new Error(errorMessage(body, "The scan request failed."));
       }
-      setScan(body as AnalysisResponse);
+      const scanResult = body as AnalysisResponse;
+      setScan(scanResult);
+      saveScan(scanResult);
     } catch (error) {
       setScanError(
         error instanceof Error
@@ -357,10 +363,10 @@ export default function DashboardOverview() {
                 <label className="sr-only" htmlFor="finding-search">
                   Search findings
                 </label>
-                <input
+                <SearchInput
                   id="finding-search"
-                  className="h-10 rounded-lg border border-input bg-card px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onChange={(event) => setQuery(event.target.value)}
+                  className="h-10 rounded-lg bg-card"
+                  onChange={(val) => { setQuery(val); setFindingsPage(1); }}
                   placeholder="Search title, file, evidence…"
                   value={query}
                 />
@@ -370,7 +376,7 @@ export default function DashboardOverview() {
                 <select
                   id="severity-filter"
                   className="h-10 rounded-lg border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  onChange={(event) => setSeverity(event.target.value)}
+                  onChange={(event) => { setSeverity(event.target.value); setFindingsPage(1); }}
                   value={severity}
                 >
                   <option value="all">All severities</option>
@@ -406,10 +412,32 @@ export default function DashboardOverview() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-3">
-              {filteredFindings.map((finding) => (
-                <FindingCard key={finding.fingerprint ?? finding.id} finding={finding} />
-              ))}
+            <div className="space-y-4">
+              <div className="grid gap-3">
+                {filteredFindings
+                  .slice(
+                    (findingsPage - 1) * findingsPageSize,
+                    findingsPage * findingsPageSize,
+                  )
+                  .map((finding) => (
+                    <FindingCard
+                      key={finding.fingerprint ?? finding.id}
+                      finding={finding}
+                    />
+                  ))}
+              </div>
+
+              {/* Reusable Pagination with Ellipses (...) */}
+              <Pagination
+                currentPage={findingsPage}
+                totalPages={Math.ceil(filteredFindings.length / findingsPageSize)}
+                onPageChange={setFindingsPage}
+                totalItems={filteredFindings.length}
+                pageSize={findingsPageSize}
+                pageSizeOptions={[5, 10, 20]}
+                onPageSizeChange={setFindingsPageSize}
+                itemLabel="findings"
+              />
             </div>
           )}
         </section>

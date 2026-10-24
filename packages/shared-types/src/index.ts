@@ -14,6 +14,10 @@ export type FindingCategory =
   | "performance"
   | "maintainability";
 
+export type FindingStatus = "needs_review" | "confirmed" | "false_positive";
+
+export type VerificationStatus = "not_run" | "verified" | "disputed";
+
 export interface ScanSummary {
   id: string;
   repositoryFullName: string;
@@ -38,8 +42,10 @@ export interface Finding {
   analyzer?: string | null;
   ruleId?: string | null;
   confidence?: number | null;
-  status: "needs_review";
-  verification: "not_run";
+  inCommitDiff?: boolean | null;
+  suggestedFix?: string | null;
+  status: FindingStatus | string;
+  verification: VerificationStatus | string;
 }
 
 export interface FixtureDescriptor {

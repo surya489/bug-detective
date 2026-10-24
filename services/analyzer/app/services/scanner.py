@@ -54,6 +54,65 @@ def fixture_path(fixture_id: str) -> Path:
     return resolved
 
 
+def _format_typescript_diagnostic(
+    diagnostic: Diagnostic,
+) -> tuple[str, str, str, FindingCategory, FindingSeverity, float]:
+    rule_id = diagnostic.rule_id
+    message = diagnostic.message
+    unused_symbol = rule_id in {"TS6133", "TS6138"}
+
+    if unused_symbol:
+        return (
+            "Unused declaration",
+            "Declared symbol or imported module is never referenced in this file.",
+            f"Static analysis detected an unused declaration: {message}. "
+            "Unused code clutters modules, increases bundle size, and causes confusion for reviewers. "
+            "Remove the unused declaration or prefix it with '_' if required by an interface.",
+            FindingCategory.MAINTAINABILITY,
+            FindingSeverity.LOW,
+            0.95,
+        )
+    if rule_id == "TS7006":
+        return (
+            "Parameter implicitly has an 'any' type",
+            "Function parameter lacks type annotation and implicitly receives 'any'.",
+            f"In strict TypeScript mode, {message}. Omitting explicit parameter types disables type checking "
+            "for this argument, making it possible to pass invalid structures and trigger unhandled runtime errors. "
+            "Add an explicit type or interface to the parameter definition.",
+            FindingCategory.BUG,
+            FindingSeverity.MEDIUM,
+            0.90,
+        )
+    if rule_id == "TS2322":
+        return (
+            "Type assignment mismatch",
+            "Assigned value type is incompatible with the declared variable or property type.",
+            f"Type error: {message}. Assigning an incompatible type can lead to runtime crashes "
+            "when properties or methods of the expected type are called. Align the variable type or cast appropriately.",
+            FindingCategory.BUG,
+            FindingSeverity.HIGH,
+            0.92,
+        )
+    if rule_id in {"TS2531", "TS2532", "TS2533"}:
+        return (
+            "Object is possibly 'null' or 'undefined'",
+            "Accessing a property or calling a function on a value that may be null or undefined.",
+            f"Potential null pointer exception: {message}. Accessing properties of null/undefined values "
+            "causes unhandled TypeError runtime crashes. Guard with optional chaining (?.) or an explicit condition.",
+            FindingCategory.BUG,
+            FindingSeverity.HIGH,
+            0.90,
+        )
+    return (
+        f"TypeScript diagnostic {rule_id}",
+        "The TypeScript compiler reported a static type-checking diagnostic.",
+        f"TypeScript diagnostic {rule_id}: {message}. Review the source code and ensure types and interfaces satisfy compiler strict rules.",
+        FindingCategory.BUG,
+        FindingSeverity.MEDIUM,
+        0.85,
+    )
+
+
 def normalize_finding(diagnostic: Diagnostic, scan_id: UUID) -> Finding:
     normalized_path = Path(diagnostic.path).as_posix()
     analyzer_name = diagnostic.analyzer_name or "typescript"
@@ -80,31 +139,24 @@ def normalize_finding(diagnostic: Diagnostic, scan_id: UUID) -> Finding:
                 "analyzer": analyzer_name,
                 "ruleId": diagnostic.rule_id,
                 "confidence": diagnostic.confidence,
+                "suggestedFix": diagnostic.suggested_fix,
                 "status": ReviewStatus.NEEDS_REVIEW,
                 "verification": VerificationStatus.NOT_RUN,
             }
         )
 
-    unused_symbol = diagnostic.rule_id in {"TS6133", "TS6138"}
+    title, description, explanation, category, severity, confidence = (
+        _format_typescript_diagnostic(diagnostic)
+    )
     return Finding.model_validate(
         {
             "id": uuid5(FINDING_NAMESPACE, fingerprint),
             "scanId": scan_id,
-            "title": (
-                "Unused declaration"
-                if unused_symbol
-                else f"TypeScript diagnostic {diagnostic.rule_id}"
-            ),
-            "description": (
-                "The TypeScript compiler reported a static diagnostic. "
-                "Review the source and project context before treating it as a defect."
-            ),
-            "category": (
-                FindingCategory.MAINTAINABILITY
-                if unused_symbol
-                else FindingCategory.BUG
-            ),
-            "severity": FindingSeverity.LOW if unused_symbol else FindingSeverity.MEDIUM,
+            "title": title,
+            "description": description,
+            "explanation": explanation,
+            "category": category,
+            "severity": severity,
             "filePath": normalized_path,
             "startLine": diagnostic.line,
             "endLine": diagnostic.line,
@@ -112,7 +164,7 @@ def normalize_finding(diagnostic: Diagnostic, scan_id: UUID) -> Finding:
             "fingerprint": fingerprint,
             "analyzer": "typescript",
             "ruleId": diagnostic.rule_id,
-            "confidence": None,
+            "confidence": confidence,
             "status": ReviewStatus.NEEDS_REVIEW,
             "verification": VerificationStatus.NOT_RUN,
         }
@@ -225,6 +277,15 @@ def _analyze_discovery(
                     target = staging_root / source.relative_path
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(source.content)
+
+                # Provide ambient declarations for isolated JSX/React analysis
+                if any(p.endswith((".tsx", ".jsx")) for p in source_paths):
+                    ambient_dts = staging_root / "_bug_detective_env.d.ts"
+                    ambient_dts.write_text(
+                        "declare namespace JSX { interface IntrinsicElements { [elemName: string]: any; } interface Element extends any {} interface ElementClass extends any {} }\n"
+                        "declare const React: any;\ndeclare const window: any;\ndeclare const document: any;\n",
+                        encoding="utf-8",
+                    )
                 for adp in adapters:
                     remaining = limits.max_scan_seconds - (time.monotonic() - started_clock)
                     if remaining <= 0:

@@ -82,6 +82,8 @@ class Finding(BaseModel):
     analyzer: str | None = None
     rule_id: str | None = None
     confidence: Annotated[float, Field(ge=0, le=1)] | None = None
+    in_commit_diff: bool | None = None
+    suggested_fix: str | None = None
     status: ReviewStatus = ReviewStatus.NEEDS_REVIEW
     verification: VerificationStatus = VerificationStatus.NOT_RUN
 

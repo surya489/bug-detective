@@ -4,19 +4,28 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import {
+  LayoutDashboard,
+  FolderGit2,
+  Radar,
+  Bug,
+  Settings,
+} from "lucide-react";
 import { GitHubUserNav } from "@/components/dashboard/github-user-nav";
 
 const navigation = [
-  { href: "/", label: "Dashboard", available: true },
-  { href: "/repositories", label: "Repositories", available: true },
-  { href: "/scans", label: "Scans", available: false },
-  { href: "/findings", label: "Findings", available: false },
-  { href: "/settings", label: "Settings", available: false },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, available: true },
+  { href: "/repositories", label: "Repositories", icon: FolderGit2, available: true },
+  { href: "/scans", label: "Scans", icon: Radar, available: true },
+  { href: "/findings", label: "Findings", icon: Bug, available: true },
+  { href: "/settings", label: "Settings", icon: Settings, available: true },
 ];
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
   "/repositories": "Repositories",
+  "/scans": "Scans History",
+  "/findings": "Findings Tracker",
   "/settings": "Settings",
 };
 
@@ -49,12 +58,13 @@ function AnalyzerHealth() {
     <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
       <span
         aria-hidden="true"
-        className={`size-2 rounded-full ${online === null
-          ? "bg-muted-foreground"
-          : online
-            ? "bg-emerald-400"
-            : "bg-amber-400"
-          }`}
+        className={`size-2 rounded-full ${
+          online === null
+            ? "bg-muted-foreground"
+            : online
+              ? "bg-emerald-400"
+              : "bg-amber-400"
+        }`}
       />
       {online === null
         ? "Checking analyzer"
@@ -85,44 +95,37 @@ export default function DashboardShell({
               Bug Detective
             </span>
             <span className="block text-xs text-muted-foreground">
-              Local analysis workspace
+              AI Code Inspection & Triage
             </span>
           </span>
         </Link>
 
-        <nav aria-label="Main navigation" className="mt-10 space-y-1">
-          {navigation.map((item) =>
-            item.available ? (
+        <nav aria-label="Main navigation" className="mt-8 space-y-1">
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
               <Link
                 key={item.label}
                 href={item.href}
-                aria-current={pathname === item.href ? "page" : undefined}
-                className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === item.href
-                  ? "bg-primary/10 font-medium text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  }`}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  isActive
+                    ? "bg-primary/10 text-primary shadow-sm"
+                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                }`}
               >
-                {item.label}
+                <Icon className={`size-4 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                <span className="flex-1">{item.label}</span>
               </Link>
-            ) : (
-              <span
-                key={item.label}
-                aria-disabled="true"
-                title="Coming in a later phase"
-                className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2.5 text-sm text-muted-foreground/60"
-              >
-                {item.label}
-                <span className="text-[10px] uppercase tracking-wide">Soon</span>
-              </span>
-            ),
-          )}
+            );
+          })}
         </nav>
 
         <div className="mt-auto rounded-xl border border-border bg-background p-4">
-          <p className="text-xs font-medium text-foreground">Read-only analysis</p>
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            Scan a local fixture or connect an installed GitHub App to analyze
-            an immutable repository commit.
+          <p className="text-xs font-semibold text-foreground">SonarQube + CodeRabbit Mode</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+            Static compiler diagnostics and intelligent AI defect detection with manual tracking.
           </p>
         </div>
       </aside>
@@ -145,30 +148,25 @@ export default function DashboardShell({
             aria-label="Mobile navigation"
             className="flex gap-1 overflow-x-auto border-t border-border px-3 py-2 lg:hidden"
           >
-            {navigation.map((item) =>
-              item.available ? (
+            {navigation.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
                 <Link
                   key={item.label}
                   href={item.href}
-                  aria-current={pathname === item.href ? "page" : undefined}
-                  className={`shrink-0 rounded-md px-3 py-2 text-xs ${pathname === item.href
-                    ? "bg-primary/10 font-medium text-primary"
-                    : "text-muted-foreground"
-                    }`}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium ${
+                    isActive
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  {item.label}
+                  <Icon className="size-3.5" />
+                  <span>{item.label}</span>
                 </Link>
-              ) : (
-                <span
-                  key={item.label}
-                  aria-disabled="true"
-                  className="shrink-0 cursor-not-allowed px-3 py-2 text-xs text-muted-foreground/50"
-                  title="Coming in a later phase"
-                >
-                  {item.label} · Soon
-                </span>
-              ),
-            )}
+              );
+            })}
           </nav>
         </header>
         {children}

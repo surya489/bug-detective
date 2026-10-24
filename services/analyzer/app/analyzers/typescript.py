@@ -249,7 +249,7 @@ class TypeScriptAdapter:
                 duration_ms=duration_ms,
             )
 
-        unresolved_modules = {"TS2307", "TS2792"}
+        unresolved_modules = {"TS2307", "TS2792", "TS7026", "TS2686"}
         partial = any(item.rule_id in unresolved_modules for item in diagnostics)
         usable_diagnostics = [
             item for item in diagnostics if item.rule_id not in unresolved_modules

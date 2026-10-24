@@ -11,7 +11,7 @@
     "build": "npm run build --workspace @bug-detective/web",
     "start": "npm run start --workspace @bug-detective/web",
     "lint": "eslint apps/web",
-    "test:web": "node --require ./apps/web/tests/register-typescript.cjs --test ./apps/web/tests/github.test.cjs"
+    "test:web": "node --require ./apps/web/tests/register-typescript.cjs --test ./apps/web/tests/github.test.cjs ./apps/web/tests/pagination.test.cjs ./apps/web/tests/commit-diff.test.cjs"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

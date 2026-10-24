@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
   ArrowLeft,
+  ChevronLeft,
   ChevronRight,
   ExternalLink,
   FolderGit2,
@@ -24,6 +25,9 @@ import {
 import { GitHubIcon } from "@/components/ui/github-icon";
 import { Button } from "@/components/ui/button";
 import FindingCard from "@/components/findings/finding-card";
+import ScanFindingsReport from "@/components/findings/scan-findings-report";
+import { EmptyState, Pagination, SearchInput } from "@/components/ui";
+import { saveScan } from "@/lib/scans/scan-store";
 import type { GitHubUser } from "@/lib/auth/session";
 import type { GitHubRepository } from "@/lib/github/repositories";
 import type {
@@ -83,6 +87,10 @@ function RepositoriesContent() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "public" | "private">("all");
+  const [languageFilter, setLanguageFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"updated" | "stars" | "forks" | "name_asc" | "name_desc">("updated");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(9);
 
   // Selection & Scan State
   const [selectedRepository, setSelectedRepository] =
@@ -251,7 +259,9 @@ function RepositoriesContent() {
           body?.error?.message || body?.detail || "The repository scan failed.",
         );
       }
-      setScan(body as AnalysisResponse);
+      const scanResult = body as AnalysisResponse;
+      setScan(scanResult);
+      saveScan(scanResult);
     } catch (err) {
       setScanError(
         err instanceof Error ? err.message : "The repository scan failed.",
@@ -262,24 +272,57 @@ function RepositoriesContent() {
   }
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+  const availableLanguages = useMemo(() => {
+    const langs = new Set<string>();
+    for (const repo of repositories) {
+      if (repo.language) langs.add(repo.language);
+    }
+    return Array.from(langs).sort();
+  }, [repositories]);
+
   const filteredRepositories = useMemo(() => {
-    return repositories.filter((repo) => {
-      const matchesSearch =
-        normalizedSearchQuery.length === 0 ||
-        repo.name.toLowerCase().includes(normalizedSearchQuery) ||
-        (repo.description ?? "")
-          .toLowerCase()
-          .includes(normalizedSearchQuery) ||
-        (repo.language ?? "").toLowerCase().includes(normalizedSearchQuery);
+    return repositories
+      .filter((repo) => {
+        const matchesSearch =
+          normalizedSearchQuery.length === 0 ||
+          repo.name.toLowerCase().includes(normalizedSearchQuery) ||
+          (repo.description ?? "")
+            .toLowerCase()
+            .includes(normalizedSearchQuery) ||
+          (repo.language ?? "").toLowerCase().includes(normalizedSearchQuery);
 
-      const matchesFilter =
-        filter === "all" ||
-        (filter === "public" && !repo.isPrivate) ||
-        (filter === "private" && repo.isPrivate);
+        const matchesFilter =
+          filter === "all" ||
+          (filter === "public" && !repo.isPrivate) ||
+          (filter === "private" && repo.isPrivate);
 
-      return matchesSearch && matchesFilter;
-    });
-  }, [repositories, normalizedSearchQuery, filter]);
+        const matchesLang =
+          languageFilter === "all" || repo.language === languageFilter;
+
+        return matchesSearch && matchesFilter && matchesLang;
+      })
+      .sort((a, b) => {
+        if (sortBy === "stars") return b.starsCount - a.starsCount;
+        if (sortBy === "forks") return b.forksCount - a.forksCount;
+        if (sortBy === "name_asc") return a.name.localeCompare(b.name);
+        if (sortBy === "name_desc") return b.name.localeCompare(a.name);
+        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return dateB - dateA;
+      });
+  }, [repositories, normalizedSearchQuery, filter, languageFilter, sortBy]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, filter, languageFilter, sortBy, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRepositories.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRepositories = filteredRepositories.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
   if (sessionLoading) {
     return (
@@ -557,14 +600,7 @@ function RepositoriesContent() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  Detailed Findings & Triage
-                </h4>
-                {scan.findings.map((finding) => (
-                  <FindingCard key={finding.id} finding={finding} />
-                ))}
-              </div>
+              <ScanFindingsReport scan={scan} initialPageSize={5} />
             )}
           </section>
         )}
@@ -619,26 +655,13 @@ function RepositoriesContent() {
 
       {/* Search & Filter Bar */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="relative w-full min-w-0 md:max-w-md md:flex-1">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search repositories..."
+        <div className="w-full min-w-0 md:max-w-md md:flex-1">
+          <SearchInput
+            placeholder="Search repositories by name, language, or description..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label="Search repositories by name, language, or description"
-            className="h-11 w-full rounded-xl border border-border bg-card py-2 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            onChange={setSearchQuery}
+            className="h-11 bg-card"
           />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              aria-label="Clear repository search"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
         </div>
 
         <div className="flex w-full items-center gap-2 md:w-auto">
@@ -678,6 +701,50 @@ function RepositoriesContent() {
             </button>
           </div>
 
+          {/* Language Filter */}
+          {availableLanguages.length > 0 && (
+            <select
+              value={languageFilter}
+              onChange={(e) => setLanguageFilter(e.target.value)}
+              aria-label="Filter by language"
+              className="h-10 rounded-xl border border-border bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-none"
+            >
+              <option value="all">All Languages</option>
+              {availableLanguages.map((lang) => (
+                <option key={lang} value={lang}>
+                  {lang}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Sort Selector */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            aria-label="Sort repositories"
+            className="h-10 rounded-xl border border-border bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-none"
+          >
+            <option value="updated">Recently Updated</option>
+            <option value="stars">Most Stars</option>
+            <option value="forks">Most Forks</option>
+            <option value="name_asc">Name (A → Z)</option>
+            <option value="name_desc">Name (Z → A)</option>
+          </select>
+
+          {/* Page Size Selector */}
+          <select
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            aria-label="Items per page"
+            className="h-10 rounded-xl border border-border bg-card px-2 text-xs text-foreground focus:border-primary focus:outline-none"
+          >
+            <option value={6}>6 / page</option>
+            <option value={9}>9 / page</option>
+            <option value={12}>12 / page</option>
+            <option value={24}>24 / page</option>
+          </select>
+
           <button
             type="button"
             onClick={() => {
@@ -714,23 +781,23 @@ function RepositoriesContent() {
           ))}
         </div>
       ) : filteredRepositories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border py-12 text-center">
-          <FolderGit2 className="mx-auto size-10 text-muted-foreground/60" />
-          <h2 className="mt-3 text-sm font-semibold text-foreground">
-            {normalizedSearchQuery
+        <EmptyState
+          icon={FolderGit2}
+          title={
+            normalizedSearchQuery
               ? "No matching repositories found"
-              : "No repositories discovered"}
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {normalizedSearchQuery
+              : "No repositories discovered"
+          }
+          description={
+            normalizedSearchQuery
               ? `No repositories matched "${searchQuery}". Try adjusting your search or filters.`
-              : "Your connected GitHub account doesn't seem to have repositories in this category."}
-          </p>
-        </div>
+              : "Your connected GitHub account doesn't seem to have repositories in this category."
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence initial={false} mode="popLayout">
-            {filteredRepositories.map((repo, index) => {
+            {paginatedRepositories.map((repo, index) => {
               const langColor = repo.language
                 ? LANGUAGE_COLORS[repo.language] || "#888888"
                 : null;
@@ -836,6 +903,18 @@ function RepositoriesContent() {
           </AnimatePresence>
         </div>
       )}
+
+      {/* Reusable Pagination with Ellipses (...) for Long Repository Lists */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        totalItems={filteredRepositories.length}
+        pageSize={pageSize}
+        pageSizeOptions={[6, 9, 12, 24]}
+        onPageSizeChange={setPageSize}
+        itemLabel="repositories"
+      />
     </main>
   );
 }

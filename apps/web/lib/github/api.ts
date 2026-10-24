@@ -99,6 +99,24 @@ interface InstallationRepositoriesResponse {
   repositories?: unknown[];
 }
 
+export interface GitHubCommitFileItem {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+  patch?: string;
+  sha?: string;
+}
+
+export interface GitHubCommitDetail {
+  sha: string;
+  message?: string;
+  author?: string | null;
+  date?: string | null;
+  files?: GitHubCommitFileItem[];
+}
+
 interface GitHubCommitResponse {
   sha?: unknown;
   commit?: {
@@ -106,6 +124,15 @@ interface GitHubCommitResponse {
     author?: { name?: unknown; date?: unknown } | null;
   };
   author?: { login?: unknown } | null;
+  files?: Array<{
+    filename?: unknown;
+    status?: unknown;
+    additions?: unknown;
+    deletions?: unknown;
+    changes?: unknown;
+    patch?: unknown;
+    sha?: unknown;
+  }>;
 }
 
 interface GitTreeResponse {
@@ -402,20 +429,57 @@ export async function listRepositoryCommits(
   return { commits, hasMore: /rel="next"/.test(link) || data.length === 30 };
 }
 
-export async function validateRepositoryCommit(
+export async function getRepositoryCommitDetails(
   accessToken: string,
   repository: GitHubRepository,
   commitSha: string,
   timeoutMs = 10_000,
-): Promise<boolean> {
-  if (!/^[0-9a-f]{40}$/i.test(commitSha)) return false;
+): Promise<GitHubCommitDetail | null> {
+  if (!/^[0-9a-f]{40}$/i.test(commitSha)) return null;
   const path = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/commits/${commitSha.toLowerCase()}`;
   const { data } = await githubGet<GitHubCommitResponse>(
     path,
     accessToken,
     timeoutMs,
   );
-  return typeof data.sha === "string" && data.sha.toLowerCase() === commitSha.toLowerCase();
+  if (typeof data.sha !== "string" || data.sha.toLowerCase() !== commitSha.toLowerCase()) {
+    return null;
+  }
+  const files: GitHubCommitFileItem[] | undefined = Array.isArray(data.files)
+    ? data.files
+        .filter((f) => typeof f?.filename === "string")
+        .map((f) => ({
+          filename: String(f.filename),
+          status: typeof f.status === "string" ? f.status : "modified",
+          additions: typeof f.additions === "number" ? f.additions : 0,
+          deletions: typeof f.deletions === "number" ? f.deletions : 0,
+          changes: typeof f.changes === "number" ? f.changes : 0,
+          patch: typeof f.patch === "string" ? f.patch : undefined,
+          sha: typeof f.sha === "string" ? f.sha : undefined,
+        }))
+    : undefined;
+  return {
+    sha: data.sha,
+    message: typeof data.commit?.message === "string" ? data.commit.message : undefined,
+    author: typeof data.author?.login === "string" ? data.author.login : null,
+    date: typeof data.commit?.author?.date === "string" ? String(data.commit.author.date) : null,
+    files,
+  };
+}
+
+export async function validateRepositoryCommit(
+  accessToken: string,
+  repository: GitHubRepository,
+  commitSha: string,
+  timeoutMs = 10_000,
+): Promise<boolean> {
+  const commit = await getRepositoryCommitDetails(
+    accessToken,
+    repository,
+    commitSha,
+    timeoutMs,
+  );
+  return commit !== null;
 }
 
 export async function getCommitTree(

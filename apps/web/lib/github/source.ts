@@ -1,6 +1,7 @@
 import {
   getBlob,
   getCommitTree,
+  getRepositoryCommitDetails,
   GitHubApiError,
   type GitHubRepository,
   validateRepositoryCommit,
@@ -66,6 +67,34 @@ const SENSITIVE_SUFFIXES = new Set([
 export interface RetrievedSourceFile {
   path: string;
   content: string;
+  status?: string;
+  patch?: string;
+  changedLines?: number[];
+}
+
+export function parseDiffChangedLines(patch?: string): number[] {
+  if (!patch) return [];
+  const changedLines: number[] = [];
+  const lines = patch.split("\n");
+  let currentLine = 0;
+
+  for (const line of lines) {
+    if (line.startsWith("@@")) {
+      const match = /@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+      if (match) {
+        currentLine = parseInt(match[1], 10);
+      }
+    } else if (line.startsWith("+")) {
+      changedLines.push(currentLine);
+      currentLine += 1;
+    } else if (line.startsWith("-")) {
+      // Deleted lines do not advance line counter in new version
+    } else {
+      currentLine += 1;
+    }
+  }
+
+  return changedLines;
 }
 
 export interface SourceInspection {
@@ -168,14 +197,31 @@ export async function retrieveRepositorySource(
   const started = Date.now();
   const remainingMs = () => MAX_PROCESSING_MS - (Date.now() - started);
   if (remainingMs() <= 0) throw new GitHubApiError("limit", 0);
-  const validCommit = await validateRepositoryCommit(
+  const commitDetail = await getRepositoryCommitDetails(
     accessToken,
     repository,
     commitSha,
     remainingMs(),
   );
-  if (!validCommit) throw new GitHubApiError("not_found", 404);
+  if (!commitDetail) throw new GitHubApiError("not_found", 404);
   if (remainingMs() <= 0) throw new GitHubApiError("limit", 0);
+
+  const commitFilesMap = new Map<
+    string,
+    { status: string; patch?: string; changedLines: number[] }
+  >();
+  if (Array.isArray(commitDetail.files) && commitDetail.files.length > 0) {
+    for (const file of commitDetail.files) {
+      if (file.status !== "removed") {
+        commitFilesMap.set(file.filename, {
+          status: file.status,
+          patch: file.patch,
+          changedLines: parseDiffChangedLines(file.patch),
+        });
+      }
+    }
+  }
+
   const tree = await getCommitTree(
     accessToken,
     repository,
@@ -206,6 +252,14 @@ export async function retrieveRepositorySource(
     if (!path) {
       recordSkipped(inspections, "unavailable-path", "invalid_path");
       warnings.push("One or more repository paths could not be safely processed.");
+      continue;
+    }
+
+    if (
+      commitFilesMap.size > 0 &&
+      !commitFilesMap.has(path) &&
+      !SAFE_JSON_CONFIGS.has(path.toLowerCase())
+    ) {
       continue;
     }
     if (entry.type === "commit") {
@@ -274,7 +328,14 @@ export async function retrieveRepositorySource(
         recordSkipped(inspections, path, "non_utf8_file", bytes.byteLength);
         continue;
       }
-      files.push({ path, content });
+      const diffMeta = commitFilesMap.get(path);
+      files.push({
+        path,
+        content,
+        status: diffMeta?.status ?? "existing",
+        patch: diffMeta?.patch,
+        changedLines: diffMeta?.changedLines,
+      });
       totalBytes += bytes.byteLength;
     } catch (error) {
       if (
