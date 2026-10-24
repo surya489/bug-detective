@@ -6,7 +6,7 @@ import { getRequestOrigin } from "@/lib/utils";
 
 export async function GET(request: Request) {
   const clientId =
-    process.env.GITHUB_CLIENT_ID || "";
+    process.env.GITHUB_CLIENT_ID || process.env.AUTH_GITHUB_ID || "";
   const origin = getRequestOrigin(request);
 
   if (!clientId) {

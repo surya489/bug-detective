@@ -12,5 +12,13 @@
     "start": "npm run start --workspace @bug-detective/web",
     "lint": "eslint apps/web",
     "test:web": "node --require ./apps/web/tests/register-typescript.cjs --test ./apps/web/tests/github.test.cjs"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "autoprefixer": "^10.4.20",
+    "eslint": "8.57.0",
+    "eslint-config-next": "16.0.3",
+    "postcss": "^8.5.12",
+    "tailwindcss": "^3.4.17"
   }
 }

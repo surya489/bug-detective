@@ -476,11 +476,10 @@ export default function RepositoryBrowser() {
                           setSelectedRepository(repository);
                           setCommitPage(1);
                         }}
-                        className={`block w-full rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                          selected
+                        className={`block w-full rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected
                             ? "border-primary/60 bg-primary/5"
                             : "border-border bg-background hover:border-primary/40"
-                        }`}
+                          }`}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -567,11 +566,10 @@ export default function RepositoryBrowser() {
                           setScan(null);
                           setScanError(null);
                         }}
-                        className={`w-full rounded-xl border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                          selectedSha === commit.sha
+                        className={`w-full rounded-xl border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedSha === commit.sha
                             ? "border-primary/60 bg-primary/5"
                             : "border-border bg-background hover:border-primary/40"
-                        }`}
+                          }`}
                       >
                         <p className="line-clamp-2 text-sm font-medium">{commit.message}</p>
                         <p className="mt-2 font-mono text-[11px] text-primary">

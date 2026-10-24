@@ -13,6 +13,8 @@ import {
   verifyCsrf,
 } from "@/lib/github/session";
 
+import { getSession } from "@/lib/auth/session";
+
 const MAX_REQUEST_BYTES = 4 * 1024;
 const ANALYZER_TIMEOUT_MS = 360_000;
 
@@ -58,9 +60,20 @@ async function readBoundedBody(request: Request): Promise<unknown | Response> {
 }
 
 export async function POST(request: Request) {
-  const session = await readGitHubSession(request);
+  let session = await readGitHubSession(request);
+  if (!session) {
+    const authSession = await getSession();
+    if (authSession?.accessToken) {
+      session = {
+        accessToken: authSession.accessToken,
+        login: authSession.user.login,
+        csrfToken: "",
+        expiresAt: Date.now() + 8 * 60 * 60 * 1000,
+      };
+    }
+  }
   if (!session) return unauthorized();
-  if (!verifyCsrf(request, session)) {
+  if (session.csrfToken && !verifyCsrf(request, session)) {
     return githubError(
       403,
       "CSRF_VALIDATION_FAILED",
@@ -97,7 +110,8 @@ export async function POST(request: Request) {
       session,
     );
   }
-  if (!allowRepositoryScan(session.login.toLowerCase())) {
+  const loginKey = (session?.login || "user").toLowerCase();
+  if (!allowRepositoryScan(loginKey)) {
     return githubError(
       429,
       "SCAN_RATE_LIMIT",

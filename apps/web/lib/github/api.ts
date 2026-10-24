@@ -203,8 +203,8 @@ function repositoryInfo(value: unknown): GitHubRepository | null {
   };
   const visibility =
     item.visibility === "public" ||
-    item.visibility === "private" ||
-    item.visibility === "internal"
+      item.visibility === "private" ||
+      item.visibility === "internal"
       ? item.visibility
       : item.private === true
         ? "private"
@@ -344,8 +344,22 @@ export async function findAccessibleRepository(
   repositoryId: number,
 ): Promise<GitHubRepository | null> {
   if (!Number.isSafeInteger(repositoryId) || repositoryId < 1) return null;
-  const { repositories } = await listAccessibleRepositories(accessToken);
-  return repositories.find((repository) => repository.id === repositoryId) ?? null;
+  try {
+    const { repositories } = await listAccessibleRepositories(accessToken);
+    const found = repositories.find((repository) => repository.id === repositoryId);
+    if (found) return found;
+  } catch {
+    // If installations listing fails or empty, attempt direct repository lookup
+  }
+  try {
+    const { data } = await githubGet<unknown>(
+      `/repositories/${repositoryId}`,
+      accessToken,
+    );
+    return repositoryInfo(data);
+  } catch {
+    return null;
+  }
 }
 
 export async function listRepositoryCommits(
@@ -532,6 +546,7 @@ export async function revokeGitHubAuthorization(
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
   if (!clientId || !clientSecret) return false;
+  console.log("GITHUB_CLIENT_ID", process.env.GITHUB_CLIENT_ID);
   try {
     const response = await fetch(
       `${GITHUB_API_ORIGIN}/applications/${encodeURIComponent(clientId)}/grant`,

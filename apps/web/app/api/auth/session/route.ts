@@ -5,7 +5,8 @@ export async function GET() {
   const session = await getSession();
 
   const isConfigured = Boolean(
-    (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+    (process.env.GITHUB_CLIENT_ID || process.env.AUTH_GITHUB_ID) &&
+    (process.env.GITHUB_CLIENT_SECRET || process.env.AUTH_GITHUB_SECRET),
   );
 
   if (!session) {

@@ -185,3 +185,39 @@ class AnalysisResponse(BaseModel):
     finished_at: datetime
     repository_full_name: str | None = None
     commit_sha: Annotated[str, Field(pattern=r"^[0-9a-fA-F]{40}$")] | None = None
+
+
+class ExplainFindingRequest(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, extra="forbid")
+
+    title: NonEmptyText
+    evidence: str = ""
+    file_path: NonEmptyText
+    start_line: Annotated[int, Field(ge=1)] = 1
+    code_context: str = ""
+
+
+class ExplainFindingResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    explanation: str
+    suggested_fix: str | None = None
+
+
+class VerifyFindingRequest(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, extra="forbid")
+
+    title: NonEmptyText
+    evidence: str = ""
+    file_path: NonEmptyText
+    start_line: Annotated[int, Field(ge=1)] = 1
+    code_context: str = ""
+
+
+class VerifyFindingResponse(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    verified: bool
+    confidence: float
+    explanation: str
+    recommended_action: str

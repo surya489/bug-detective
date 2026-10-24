@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from uuid import UUID, uuid4, uuid5
 
+from app.analyzers.ai_analyzer import AIAnalyzerAdapter
 from app.analyzers.base import AnalyzerAdapter, Diagnostic
 from app.analyzers.typescript import TypeScriptAdapter
 from app.schemas import (
@@ -55,10 +56,35 @@ def fixture_path(fixture_id: str) -> Path:
 
 def normalize_finding(diagnostic: Diagnostic, scan_id: UUID) -> Finding:
     normalized_path = Path(diagnostic.path).as_posix()
+    analyzer_name = diagnostic.analyzer_name or "typescript"
     fingerprint = hashlib.sha256(
-        f"typescript\0{diagnostic.rule_id}\0{normalized_path}\0"
+        f"{analyzer_name}\0{diagnostic.rule_id}\0{normalized_path}\0"
         f"{diagnostic.line}\0{diagnostic.column}\0{diagnostic.message}".encode("utf-8")
     ).hexdigest()
+
+    if diagnostic.title is not None:
+        return Finding.model_validate(
+            {
+                "id": uuid5(FINDING_NAMESPACE, fingerprint),
+                "scanId": scan_id,
+                "title": diagnostic.title,
+                "description": diagnostic.description or "Issue detected by AI analysis.",
+                "explanation": diagnostic.explanation,
+                "category": diagnostic.category or FindingCategory.BUG,
+                "severity": diagnostic.severity or FindingSeverity.MEDIUM,
+                "filePath": normalized_path,
+                "startLine": diagnostic.line,
+                "endLine": diagnostic.line,
+                "evidence": diagnostic.message,
+                "fingerprint": fingerprint,
+                "analyzer": analyzer_name,
+                "ruleId": diagnostic.rule_id,
+                "confidence": diagnostic.confidence,
+                "status": ReviewStatus.NEEDS_REVIEW,
+                "verification": VerificationStatus.NOT_RUN,
+            }
+        )
+
     unused_symbol = diagnostic.rule_id in {"TS6133", "TS6138"}
     return Finding.model_validate(
         {
@@ -179,15 +205,18 @@ def _analyze_discovery(
         if Path(source.relative_path).suffix.lower()
         in {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"}
     )
-    selected_adapter = adapter or TypeScriptAdapter()
+    adapters: tuple[AnalyzerAdapter, ...] = (
+        (adapter,) if adapter is not None else (TypeScriptAdapter(), AIAnalyzerAdapter())
+    )
     if not source_paths:
-        analyzer_runs.append(
-            AnalyzerRun(
-                name=selected_adapter.name,
-                status=AnalyzerStatus.SKIPPED,
-                message="No supported JavaScript or TypeScript source files were discovered.",
+        for adp in adapters:
+            analyzer_runs.append(
+                AnalyzerRun(
+                    name=adp.name,
+                    status=AnalyzerStatus.SKIPPED,
+                    message="No supported JavaScript or TypeScript source files were discovered.",
+                )
             )
-        )
     else:
         try:
             with tempfile.TemporaryDirectory(prefix="bug-detective-") as staging:
@@ -196,44 +225,48 @@ def _analyze_discovery(
                     target = staging_root / source.relative_path
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(source.content)
-                remaining = limits.max_scan_seconds - (time.monotonic() - started_clock)
-                if remaining <= 0:
-                    analyzer_run = AnalyzerRun(
-                        name=selected_adapter.name,
-                        status=AnalyzerStatus.TIMED_OUT,
-                        message="The fixture scan exceeded its overall time limit.",
-                    )
-                    diagnostics = ()
-                else:
+                for adp in adapters:
+                    remaining = limits.max_scan_seconds - (time.monotonic() - started_clock)
+                    if remaining <= 0:
+                        analyzer_runs.append(
+                            AnalyzerRun(
+                                name=adp.name,
+                                status=AnalyzerStatus.TIMED_OUT,
+                                message="The fixture scan exceeded its overall time limit.",
+                            )
+                        )
+                        continue
                     analyzer_run, diagnostics = _run_adapter(
-                        selected_adapter,
+                        adp,
                         staging,
                         source_paths,
                         min(limits.max_analyzer_seconds, remaining),
                     )
-                analyzer_runs.append(analyzer_run)
-                if analyzer_run.status in {
-                    AnalyzerStatus.COMPLETED,
-                    AnalyzerStatus.PARTIAL,
-                }:
-                    findings = [
-                        normalize_finding(item, scan_id) for item in diagnostics
-                    ]
-                    if len(findings) > limits.max_findings:
-                        findings = findings[: limits.max_findings]
-                        analyzer_run.status = AnalyzerStatus.PARTIAL
-                        analyzer_run.message = (
-                            f"Results were limited to {limits.max_findings} findings; "
-                            "this scan may be incomplete."
-                        )
+                    analyzer_runs.append(analyzer_run)
+                    if analyzer_run.status in {
+                        AnalyzerStatus.COMPLETED,
+                        AnalyzerStatus.PARTIAL,
+                    }:
+                        for item in diagnostics:
+                            if len(findings) < limits.max_findings:
+                                findings.append(normalize_finding(item, scan_id))
+                            else:
+                                analyzer_run.status = AnalyzerStatus.PARTIAL
+                                analyzer_run.message = (
+                                    f"Results were limited to {limits.max_findings} findings; "
+                                    "this scan may be incomplete."
+                                )
+                                break
         except (OSError, RuntimeError):
-            analyzer_runs.append(
-                AnalyzerRun(
-                    name=selected_adapter.name,
-                    status=AnalyzerStatus.FAILED,
-                    message="The analyzer could not safely stage or process the fixture.",
-                )
-            )
+            for adp in adapters:
+                if not any(run.name == adp.name for run in analyzer_runs):
+                    analyzer_runs.append(
+                        AnalyzerRun(
+                            name=adp.name,
+                            status=AnalyzerStatus.FAILED,
+                            message="The analyzer could not safely stage or process the fixture.",
+                        )
+                    )
 
     errors = [
         run.message

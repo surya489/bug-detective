@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.schemas import AnalyzerStatus
+from app.schemas import AnalyzerStatus, FindingCategory, FindingSeverity
 
 
 @dataclass(frozen=True)
@@ -13,6 +13,14 @@ class Diagnostic:
     column: int
     rule_id: str
     message: str
+    title: str | None = None
+    category: FindingCategory | None = None
+    severity: FindingSeverity | None = None
+    description: str | None = None
+    explanation: str | None = None
+    confidence: float | None = None
+    suggested_fix: str | None = None
+    analyzer_name: str | None = None
 
 
 @dataclass(frozen=True)

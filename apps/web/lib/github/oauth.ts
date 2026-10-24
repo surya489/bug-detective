@@ -1,5 +1,6 @@
 export function getGitHubOAuthUrl(origin: string, state: string): string {
-  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientId =
+    process.env.GITHUB_CLIENT_ID || process.env.AUTH_GITHUB_ID;
   if (!clientId) {
     throw new Error("GitHub client ID is not configured");
   }
@@ -11,10 +12,11 @@ export function getGitHubOAuthUrl(origin: string, state: string): string {
     state,
   });
 
-  // Only pass OAuth scopes for traditional OAuth Apps (IDs starting with Iv).
-  // GitHub Apps (IDs starting with Ov) define permissions statically in their
-  // settings; passing scope query params causes GitHub to return 404 Not Found.
-  if (!clientId.startsWith("Ov")) {
+  // GitHub Apps (IDs starting with Iv) define permissions statically in their
+  // settings. Traditional OAuth Apps (IDs starting with Ov or legacy hex)
+  // require scope query parameters. We include 'repo' so private repositories
+  // and commit trees are accessible.
+  if (!clientId.startsWith("Iv")) {
     params.set("scope", "read:user user:email repo");
   }
 
