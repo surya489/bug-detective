@@ -1,12 +1,18 @@
 import { requestAnalyzer } from "@/lib/api/analyzer";
 
 export async function GET() {
+  const configuredUrl =
+    process.env.ANALYZER_URL ||
+    process.env.ANALYZER_BASE_URL ||
+    "http://127.0.0.1:8001";
+
   const response = await requestAnalyzer("/health");
   if (!response.ok) {
     return Response.json(
       {
         status: "unavailable",
-        message: "The analyzer health check failed.",
+        configuredUrl,
+        message: `The analyzer at ${configuredUrl} is unreachable or offline.`,
       },
       { status: 503 },
     );
@@ -19,11 +25,13 @@ export async function GET() {
     return Response.json(
       {
         status: "unavailable",
-        message: "The analyzer returned an invalid health response.",
+        configuredUrl,
+        message: "The analyzer returned an invalid response body.",
       },
       { status: 503 },
     );
   }
+
   if (
     typeof health !== "object" ||
     health === null ||
@@ -33,11 +41,16 @@ export async function GET() {
     return Response.json(
       {
         status: "unavailable",
-        message: "The analyzer returned an unexpected health response.",
+        configuredUrl,
+        message: "The analyzer returned an unexpected health payload.",
       },
       { status: 503 },
     );
   }
 
-  return Response.json({ status: "ok" });
+  return Response.json({
+    status: "ok",
+    configuredUrl,
+    health,
+  });
 }

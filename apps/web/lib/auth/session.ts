@@ -1,18 +1,29 @@
 import { cookies } from "next/headers";
 import crypto from "node:crypto";
 
-export type GitHubUser = {
-  id: number;
+export type AuthProvider = "github" | "credentials";
+
+export type SessionUser = {
+  id: number | string;
   login: string;
   name: string | null;
   avatarUrl: string;
-  htmlUrl: string;
+  htmlUrl?: string;
   email?: string | null;
+  provider: AuthProvider;
+  isNewUser?: boolean;
+  githubConnected?: boolean;
+  githubUsername?: string | null;
+  githubAvatarUrl?: string | null;
+  githubAccessToken?: string | null;
 };
 
+// Backwards compatibility alias
+export type GitHubUser = SessionUser;
+
 export type SessionData = {
-  user: GitHubUser;
-  accessToken: string;
+  user: SessionUser;
+  accessToken?: string;
   createdAt: number;
 };
 

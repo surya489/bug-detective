@@ -9,6 +9,12 @@
           "type": "service",
           "service": "analyzer",
           "format": "url",
+          "env": "ANALYZER_URL"
+        },
+        {
+          "type": "service",
+          "service": "analyzer",
+          "format": "url",
           "env": "ANALYZER_BASE_URL"
         }
       ]

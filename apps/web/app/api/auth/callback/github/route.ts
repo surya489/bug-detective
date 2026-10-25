@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAndClearOAuthState, setSession } from "@/lib/auth/session";
+import { getAndClearOAuthState, getSession, setSession } from "@/lib/auth/session";
 import { exchangeCodeForToken, getGitHubUserProfile } from "@/lib/github/oauth";
 import { getRequestOrigin } from "@/lib/utils";
 
@@ -32,7 +32,30 @@ export async function GET(request: Request) {
   try {
     const accessToken = await exchangeCodeForToken(code, origin);
     const profile = await getGitHubUserProfile(accessToken);
+    const existingSession = await getSession();
 
+    // If the user is already authenticated via email/password, link their GitHub account
+    if (existingSession && existingSession.user.provider === "credentials") {
+      await setSession({
+        user: {
+          ...existingSession.user,
+          login: profile.login,
+          htmlUrl: profile.html_url,
+          githubConnected: true,
+          githubUsername: profile.login,
+          githubAvatarUrl: profile.avatar_url,
+          githubAccessToken: accessToken,
+        },
+        accessToken,
+        createdAt: existingSession.createdAt,
+      });
+
+      return NextResponse.redirect(
+        new URL("/repositories?connected=github", origin),
+      );
+    }
+
+    // Direct GitHub login: create session and consider them as a new user
     await setSession({
       user: {
         id: profile.id,
@@ -41,12 +64,20 @@ export async function GET(request: Request) {
         avatarUrl: profile.avatar_url,
         htmlUrl: profile.html_url,
         email: profile.email,
+        provider: "github",
+        isNewUser: true,
+        githubConnected: true,
+        githubUsername: profile.login,
+        githubAvatarUrl: profile.avatar_url,
+        githubAccessToken: accessToken,
       },
       accessToken,
       createdAt: Date.now(),
     });
 
-    return NextResponse.redirect(new URL("/repositories", origin));
+    return NextResponse.redirect(
+      new URL("/repositories?new_user=true", origin),
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "oauth_failed";
     return NextResponse.redirect(

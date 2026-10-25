@@ -392,11 +392,10 @@ function RepositoriesContent() {
                   {selectedRepository.fullName}
                 </h1>
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    selectedRepository.isPrivate
-                      ? "border border-amber-500/30 bg-amber-500/10 text-amber-300"
-                      : "border border-border bg-muted/60 text-muted-foreground"
-                  }`}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${selectedRepository.isPrivate
+                    ? "border border-amber-500/30 bg-amber-500/10 text-amber-300"
+                    : "border border-border bg-muted/60 text-muted-foreground"
+                    }`}
                 >
                   {selectedRepository.isPrivate ? "Private" : "Public"}
                 </span>
@@ -457,11 +456,10 @@ function RepositoriesContent() {
                         setScan(null);
                         setScanError(null);
                       }}
-                      className={`w-full rounded-xl border p-3 text-left transition-colors ${
-                        isSelected
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-border bg-background hover:border-primary/40"
-                      }`}
+                      className={`w-full rounded-xl border p-3 text-left transition-colors ${isSelected
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-border bg-background hover:border-primary/40"
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <p className="line-clamp-1 text-xs font-semibold text-foreground">
@@ -613,9 +611,9 @@ function RepositoriesContent() {
             alt={session.user?.login ?? "User"}
             className="size-12 rounded-xl border border-border object-cover shadow-sm"
           />
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-2">
             <div className="flex items-center gap-2">
-              <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-foreground">
+              <h1 className="min-w-0 truncate text-lg font-semibold text-foreground">
                 {session.user?.name || session.user?.login}
               </h1>
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
@@ -657,33 +655,30 @@ function RepositoriesContent() {
             <button
               type="button"
               onClick={() => setFilter("all")}
-              className={`min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors sm:px-2.5 sm:text-xs ${
-                filter === "all"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors sm:px-2.5 sm:text-xs ${filter === "all"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               All ({repositories.length})
             </button>
             <button
               type="button"
               onClick={() => setFilter("public")}
-              className={`min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors sm:px-2.5 sm:text-xs ${
-                filter === "public"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors sm:px-2.5 sm:text-xs ${filter === "public"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               Public ({repositories.filter((r) => !r.isPrivate).length})
             </button>
             <button
               type="button"
               onClick={() => setFilter("private")}
-              className={`min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors sm:px-2.5 sm:text-xs ${
-                filter === "private"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium transition-colors sm:px-2.5 sm:text-xs ${filter === "private"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               Private ({repositories.filter((r) => r.isPrivate).length})
             </button>
@@ -818,11 +813,10 @@ function RepositoriesContent() {
                           <ExternalLink className="size-3.5" />
                         </a>
                         <span
-                          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium ${
-                            repo.isPrivate
-                              ? "border border-amber-500/30 bg-amber-500/10 text-amber-300"
-                              : "border border-border bg-muted/60 text-muted-foreground"
-                          }`}
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium ${repo.isPrivate
+                            ? "border border-amber-500/30 bg-amber-500/10 text-amber-300"
+                            : "border border-border bg-muted/60 text-muted-foreground"
+                            }`}
                         >
                           {repo.isPrivate ? (
                             <>

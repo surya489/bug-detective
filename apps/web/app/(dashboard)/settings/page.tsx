@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   BrainCircuit,
@@ -12,6 +13,7 @@ import {
   Flame,
   FolderGit2,
   Lock,
+  LogIn,
   RefreshCw,
   Save,
   Server,
@@ -21,15 +23,18 @@ import {
   ShieldCheck,
   Sparkles,
   Terminal,
+  User,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GitHubIcon } from "@/components/ui/github-icon";
 
 interface HealthCheckResult {
   online: boolean;
   latencyMs: number | null;
   checkedAt: string | null;
   detail?: string;
+  configuredUrl?: string;
 }
 
 const ACTIVE_AI_RULES = [
@@ -105,6 +110,10 @@ export default function SettingsPage() {
   const [minConfidence, setMinConfidence] = useState(80);
   const [autoVerify, setAutoVerify] = useState(true);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [session, setSession] = useState<{
+    authenticated: boolean;
+    user: any;
+  } | null>(null);
 
   // Check analyzer health
   const checkHealth = async () => {
@@ -113,17 +122,20 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/analyzer/health", { cache: "no-store" });
       const elapsed = Math.round(performance.now() - start);
+      const data = await res.json().catch(() => null);
       setHealth({
         online: res.ok,
         latencyMs: elapsed,
         checkedAt: new Date().toLocaleTimeString(),
+        detail: data?.message,
+        configuredUrl: data?.configuredUrl,
       });
     } catch {
       setHealth({
         online: false,
         latencyMs: null,
         checkedAt: new Date().toLocaleTimeString(),
-        detail: "Could not reach Python FastAPI analyzer at port 8001.",
+        detail: "Could not reach analyzer health endpoint.",
       });
     } finally {
       setChecking(false);
@@ -132,6 +144,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     void checkHealth();
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((data) => setSession(data))
+      .catch(() => {});
   }, []);
 
   const handleSaveQualityGate = (e: React.FormEvent) => {
@@ -159,6 +175,148 @@ export default function SettingsPage() {
           Manage local Python AI engine parameters, review active inspection rules, and set SonarQube quality gates.
         </p>
       </div>
+
+      {/* Account & Connected Services */}
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <User className="size-4" />
+            </span>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                Account & Integrations
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Manage your profile credentials and connected source code repositories
+              </p>
+            </div>
+          </div>
+
+          {!session?.authenticated ? (
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
+            >
+              <LogIn className="size-3.5" />
+              <span>Sign In / Create Account</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary border border-primary/20">
+                {session.user?.provider === "github" ? "GitHub Account" : "Email Account"}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {/* Active User Card */}
+          <div className="rounded-xl border border-border bg-background p-4">
+            <p className="text-xs font-medium text-muted-foreground">Active Identity</p>
+            {session?.authenticated && session.user ? (
+              <div className="mt-3 flex items-center gap-3">
+                {session.user.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={session.user.avatarUrl}
+                    alt={session.user.name || "User"}
+                    className="size-10 rounded-full border border-border object-cover"
+                  />
+                ) : (
+                  <div className="flex size-10 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-sm">
+                    {(session.user.name || session.user.email || "U").slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-foreground truncate">
+                    {session.user.name || session.user.login || "Developer"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    {session.user.email || `@${session.user.login}`}
+                  </p>
+                  <p className="mt-1 text-[10px] text-primary">
+                    Signed in via {session.user.provider === "github" ? "GitHub OAuth" : "Email & Password"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2">
+                <p className="text-xs text-muted-foreground">
+                  You are currently using Bug Detective in guest mode. Sign in to save settings and scan private repositories.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <Link
+                    href="/login"
+                    className="rounded-lg bg-card border border-border px-3 py-1.5 text-xs text-foreground hover:border-primary/50 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                  >
+                    Create Account
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* GitHub Connection Card */}
+          <div className="rounded-xl border border-border bg-background p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <GitHubIcon className="size-4 text-foreground" />
+                  <p className="text-xs font-semibold text-foreground">GitHub Integration</p>
+                </div>
+                {session?.user?.githubConnected || session?.user?.provider === "github" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/20">
+                    <CheckCircle2 className="size-3" />
+                    Connected
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400 border border-amber-500/20">
+                    Not Linked
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                {session?.user?.githubConnected || session?.user?.provider === "github"
+                  ? `Connected as @${session.user.githubUsername || session.user.login}. Repository scanner can pull commit trees, blobs, and branches.`
+                  : "Connect your GitHub account to enable real-time analysis on your public and private repositories without manual uploads."}
+              </p>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-border/40">
+              {session?.user?.githubConnected || session?.user?.provider === "github" ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    @{session.user.githubUsername || session.user.login}
+                  </span>
+                  <a
+                    href="/api/auth/github"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <span>Re-authorize</span>
+                    <ExternalLink className="size-3" />
+                  </a>
+                </div>
+              ) : (
+                <a
+                  href="/api/auth/github"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-card border border-primary/40 py-2 px-3 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors shadow-sm"
+                >
+                  <GitHubIcon className="size-3.5" />
+                  <span>Connect GitHub Account</span>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Grid: Diagnostics and Quality Gate */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -216,8 +374,8 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background p-3.5 text-xs">
               <span className="text-muted-foreground">Endpoint URL</span>
-              <span className="font-mono font-medium text-foreground">
-                http://127.0.0.1:8001
+              <span className="font-mono font-medium text-foreground truncate max-w-[220px]">
+                {health.configuredUrl || "http://127.0.0.1:8001"}
               </span>
             </div>
 

@@ -1,5 +1,9 @@
-const analyzerBaseUrl =
-  process.env.ANALYZER_URL ?? "http://127.0.0.1:8001";
+const rawBaseUrl =
+  process.env.ANALYZER_URL ||
+  process.env.ANALYZER_BASE_URL ||
+  "http://127.0.0.1:8001";
+
+const analyzerBaseUrl = rawBaseUrl.replace(/\/+$/, "");
 
 export async function requestAnalyzer(
   path: string,
@@ -17,8 +21,7 @@ export async function requestAnalyzer(
       {
         error: {
           code: "ANALYZER_UNAVAILABLE",
-          message:
-            "The local analyzer is unavailable. Start FastAPI at 127.0.0.1:8001 and try again.",
+          message: `The analyzer service at ${analyzerBaseUrl} is unavailable. Ensure the FastAPI backend is running and ANALYZER_URL is configured.`,
         },
       },
       { status: 503 },
