@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -19,7 +19,16 @@ import ScanFindingsReport from "@/components/findings/scan-findings-report";
 import { getScanById, subscribeToStore } from "@/lib/scans/scan-store";
 import type { AnalysisResponse } from "@bug-detective/shared-types";
 
-export default function ScanDetailPage({
+function ScanDetailSkeleton() {
+  return (
+    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+      <div className="h-10 w-48 animate-pulse rounded-lg bg-card" />
+      <div className="h-32 animate-pulse rounded-2xl bg-card" />
+    </main>
+  );
+}
+
+function ScanDetailContent({
   params,
 }: {
   params: Promise<{ scanId: string }>;
@@ -38,12 +47,7 @@ export default function ScanDetailPage({
   }, [scanId]);
 
   if (loading) {
-    return (
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-        <div className="h-10 w-48 animate-pulse rounded-lg bg-card" />
-        <div className="h-32 animate-pulse rounded-2xl bg-card" />
-      </main>
-    );
+    return <ScanDetailSkeleton />;
   }
 
   if (!scan) {
@@ -151,5 +155,17 @@ export default function ScanDetailPage({
         <ScanFindingsReport scan={scan} initialPageSize={5} />
       )}
     </main>
+  );
+}
+
+export default function ScanDetailPage({
+  params,
+}: {
+  params: Promise<{ scanId: string }>;
+}) {
+  return (
+    <Suspense fallback={<ScanDetailSkeleton />}>
+      <ScanDetailContent params={params} />
+    </Suspense>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import type { ReactNode } from "react";
 import {
   LayoutDashboard,
@@ -28,6 +28,108 @@ const pageTitles: Record<string, string> = {
   "/findings": "Findings Tracker",
   "/settings": "Settings",
 };
+
+function getHeaderTitle(pathname: string | null): string {
+  if (!pathname) return "Dashboard";
+  if (pageTitles[pathname]) return pageTitles[pathname];
+  if (pathname.startsWith("/scans/")) return "Scan Details";
+  if (pathname.startsWith("/repositories/")) return "Repository Details";
+  return "Dashboard";
+}
+
+function isLinkActive(pathname: string | null, href: string): boolean {
+  if (!pathname) return false;
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function HeaderTitleContent() {
+  const pathname = usePathname();
+  const title = getHeaderTitle(pathname);
+
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-sm font-semibold">{title}</p>
+      <p className="hidden text-xs text-muted-foreground sm:block">
+        Bug Detective <span className="px-1 text-border">/</span> {title}
+      </p>
+    </div>
+  );
+}
+
+function HeaderTitleFallback() {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-sm font-semibold">Dashboard</p>
+      <p className="hidden text-xs text-muted-foreground sm:block">
+        Bug Detective <span className="px-1 text-border">/</span> Dashboard
+      </p>
+    </div>
+  );
+}
+
+function DesktopNavLinks({ pathname }: { pathname: string | null }) {
+  return (
+    <nav aria-label="Main navigation" className="mt-8 space-y-1">
+      {navigation.map((item) => {
+        const Icon = item.icon;
+        const isActive = isLinkActive(pathname, item.href);
+        return (
+          <Link
+            key={item.label}
+            href={item.href}
+            aria-current={isActive ? "page" : undefined}
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isActive
+              ? "bg-primary/10 text-primary shadow-sm"
+              : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+              }`}
+          >
+            <Icon className={`size-4 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+            <span className="flex-1">{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function DesktopNavContent() {
+  const pathname = usePathname();
+  return <DesktopNavLinks pathname={pathname} />;
+}
+
+function MobileNavLinks({ pathname }: { pathname: string | null }) {
+  return (
+    <nav
+      aria-label="Mobile navigation"
+      className="flex gap-1 overflow-x-auto border-t border-border px-3 py-2 lg:hidden"
+    >
+      {navigation.map((item) => {
+        const Icon = item.icon;
+        const isActive = isLinkActive(pathname, item.href);
+        return (
+          <Link
+            key={item.label}
+            href={item.href}
+            aria-current={isActive ? "page" : undefined}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium ${isActive
+              ? "bg-primary/10 text-primary font-semibold"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
+          >
+            <Icon className="size-3.5" />
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function MobileNavContent() {
+  const pathname = usePathname();
+  return <MobileNavLinks pathname={pathname} />;
+}
 
 function AnalyzerHealth() {
   const [online, setOnline] = useState<boolean | null>(null);
@@ -58,13 +160,12 @@ function AnalyzerHealth() {
     <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
       <span
         aria-hidden="true"
-        className={`size-2 rounded-full ${
-          online === null
-            ? "bg-muted-foreground"
-            : online
-              ? "bg-emerald-400"
-              : "bg-amber-400"
-        }`}
+        className={`size-2 rounded-full ${online === null
+          ? "bg-muted-foreground"
+          : online
+            ? "bg-emerald-400"
+            : "bg-amber-400"
+          }`}
       />
       {online === null
         ? "Checking analyzer"
@@ -80,9 +181,6 @@ export default function DashboardShell({
 }: {
   children: ReactNode;
 }) {
-  const pathname = usePathname();
-  const title = pageTitles[pathname] ?? "Dashboard";
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-border bg-card px-4 py-6 lg:flex">
@@ -100,27 +198,9 @@ export default function DashboardShell({
           </span>
         </Link>
 
-        <nav aria-label="Main navigation" className="mt-8 space-y-1">
-          {navigation.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                aria-current={isActive ? "page" : undefined}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  isActive
-                    ? "bg-primary/10 text-primary shadow-sm"
-                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                }`}
-              >
-                <Icon className={`size-4 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
-                <span className="flex-1">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        <Suspense fallback={<DesktopNavLinks pathname={null} />}>
+          <DesktopNavContent />
+        </Suspense>
 
         <div className="mt-auto rounded-xl border border-border bg-background p-4">
           <p className="text-xs font-semibold text-foreground">SonarQube + CodeRabbit Mode</p>
@@ -133,41 +213,17 @@ export default function DashboardShell({
       <div className="lg:pl-64">
         <header className="border-b border-border bg-background">
           <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{title}</p>
-              <p className="hidden text-xs text-muted-foreground sm:block">
-                Bug Detective <span className="px-1 text-border">/</span> {title}
-              </p>
-            </div>
+            <Suspense fallback={<HeaderTitleFallback />}>
+              <HeaderTitleContent />
+            </Suspense>
             <div className="flex items-center gap-2.5">
               <AnalyzerHealth />
               <GitHubUserNav />
             </div>
           </div>
-          <nav
-            aria-label="Mobile navigation"
-            className="flex gap-1 overflow-x-auto border-t border-border px-3 py-2 lg:hidden"
-          >
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium ${
-                    isActive
-                      ? "bg-primary/10 text-primary font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Icon className="size-3.5" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          <Suspense fallback={<MobileNavLinks pathname={null} />}>
+            <MobileNavContent />
+          </Suspense>
         </header>
         {children}
       </div>
