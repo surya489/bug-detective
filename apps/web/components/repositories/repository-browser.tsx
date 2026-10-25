@@ -8,7 +8,7 @@ import type {
   GitHubSessionState,
 } from "@bug-detective/shared-types";
 import FindingCard from "@/components/findings/finding-card";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton, ListSkeleton } from "@/components/ui";
 
 type PageState = "loading" | "ready" | "error";
 type VisibilityFilter = "all" | "public" | "private";
@@ -351,7 +351,7 @@ export default function RepositoryBrowser() {
       )}
 
       {sessionState === "loading" ? (
-        <div className="h-40 animate-pulse rounded-2xl border border-border bg-card" />
+        <Skeleton variant="card" className="h-40" />
       ) : sessionState === "error" ? (
         <section className="rounded-2xl border border-rose-400/20 bg-card p-6" role="alert">
           <h2 className="font-semibold">Connection status unavailable</h2>
@@ -444,11 +444,7 @@ export default function RepositoryBrowser() {
                 </p>
               )}
               {repositoriesState === "loading" ? (
-                <div className="mt-5 space-y-3" aria-label="Loading repositories">
-                  {[0, 1, 2].map((item) => (
-                    <div key={item} className="h-24 animate-pulse rounded-xl bg-background" />
-                  ))}
-                </div>
+                <ListSkeleton count={3} itemHeight="h-24" className="mt-5 space-y-3" aria-label="Loading repositories" />
               ) : repositoriesState === "error" ? (
                 <div className="mt-5 rounded-xl border border-rose-400/20 bg-rose-400/5 p-4 text-sm text-rose-200" role="alert">
                   <p>{repositoryError}</p>
@@ -541,7 +537,7 @@ export default function RepositoryBrowser() {
                   Select an authorized repository to load its recent commits.
                 </div>
               ) : commitsState === "loading" ? (
-                <div className="mt-6 h-48 animate-pulse rounded-xl bg-background" aria-label="Loading commits" />
+                <Skeleton className="mt-6 h-48 rounded-xl" aria-label="Loading commits" />
               ) : commitsState === "error" ? (
                 <div className="mt-6 rounded-xl border border-rose-400/20 bg-rose-400/5 p-4 text-sm text-rose-200" role="alert">
                   <p>{commitError}</p>

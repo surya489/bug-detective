@@ -26,7 +26,14 @@ import { GitHubIcon } from "@/components/ui/github-icon";
 import { Button } from "@/components/ui/button";
 import FindingCard from "@/components/findings/finding-card";
 import ScanFindingsReport from "@/components/findings/scan-findings-report";
-import { EmptyState, Pagination, SearchInput } from "@/components/ui";
+import {
+  EmptyState,
+  Pagination,
+  SearchInput,
+  PageSkeleton,
+  CardGridSkeleton,
+  ListSkeleton,
+} from "@/components/ui";
 import { saveScan } from "@/lib/scans/scan-store";
 import type { GitHubUser } from "@/lib/auth/session";
 import type { GitHubRepository } from "@/lib/github/repositories";
@@ -325,19 +332,7 @@ function RepositoriesContent() {
   );
 
   if (sessionLoading) {
-    return (
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-        <div className="h-24 w-full animate-pulse rounded-2xl border border-border/60 bg-card/60" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="h-44 animate-pulse rounded-2xl border border-border/60 bg-card/60"
-            />
-          ))}
-        </div>
-      </main>
-    );
+    return <PageSkeleton variant="cards" count={6} />;
   }
 
   // Unauthenticated State
@@ -440,14 +435,7 @@ function RepositoriesContent() {
             </div>
 
             {commitsLoading ? (
-              <div className="mt-4 space-y-2.5">
-                {[1, 2, 3, 4].map((i) => (
-                  <div
-                    key={i}
-                    className="h-16 animate-pulse rounded-xl bg-background"
-                  />
-                ))}
-              </div>
+              <ListSkeleton count={4} itemHeight="h-16" className="mt-4 space-y-2.5" />
             ) : commitsError ? (
               <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
                 {commitsError}
@@ -772,14 +760,7 @@ function RepositoriesContent() {
 
       {/* Repositories Grid */}
       {reposLoading && repositories.length === 0 ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="h-44 animate-pulse rounded-2xl border border-border/60 bg-card/60"
-            />
-          ))}
-        </div>
+        <CardGridSkeleton count={pageSize || 6} columns={3} cardHeight="h-44" />
       ) : filteredRepositories.length === 0 ? (
         <EmptyState
           icon={FolderGit2}
@@ -921,21 +902,7 @@ function RepositoriesContent() {
 
 export default function RepositoriesPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-          <div className="h-10 w-48 animate-pulse rounded-lg bg-muted/40" />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-44 animate-pulse rounded-2xl border border-border/60 bg-card/60"
-              />
-            ))}
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton variant="cards" count={6} />}>
       <RepositoriesContent />
     </Suspense>
   );

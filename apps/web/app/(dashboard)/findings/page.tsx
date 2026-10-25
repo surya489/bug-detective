@@ -20,6 +20,7 @@ import {
   MetricCard,
   Pagination,
   SearchInput,
+  PageSkeleton,
 } from "@/components/ui";
 import {
   getAllFindings,
@@ -226,6 +227,10 @@ function FindingsContent() {
     );
     setTimeout(() => setExportNotice(null), 4000);
   };
+
+  if (loading) {
+    return <PageSkeleton variant="metrics" count={4} />;
+  }
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">
@@ -478,18 +483,7 @@ function FindingsContent() {
 
 export default function FindingsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-          <div className="h-10 w-48 animate-pulse rounded-lg bg-card" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 animate-pulse rounded-2xl bg-card" />
-            ))}
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton variant="metrics" count={4} />}>
       <FindingsContent />
     </Suspense>
   );

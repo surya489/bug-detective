@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import { GitHubIcon } from "@/components/ui/github-icon";
+import { Skeleton } from "@/components/ui";
 import type { GitHubUser } from "@/lib/auth/session";
 
 type SessionState = {
@@ -60,7 +61,7 @@ export function GitHubUserNav() {
   }
 
   if (loading) {
-    return <div className="h-8 w-28 animate-pulse rounded-full bg-muted/40" />;
+    return <Skeleton variant="circle" className="h-8 w-28" />;
   }
 
   if (session?.authenticated && session.user) {

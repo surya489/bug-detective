@@ -22,6 +22,7 @@ import {
   Pagination,
   ScanStatusBadge,
   SearchInput,
+  PageSkeleton,
 } from "@/components/ui";
 import {
   getSavedScans,
@@ -166,6 +167,10 @@ export default function ScansPage() {
       ),
     [scans],
   );
+
+  if (loading) {
+    return <PageSkeleton variant="list" count={5} />;
+  }
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">

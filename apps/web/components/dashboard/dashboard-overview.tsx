@@ -7,7 +7,7 @@ import type {
 } from "@bug-detective/shared-types";
 import { Button } from "@/components/ui/button";
 import FindingCard from "@/components/findings/finding-card";
-import { Pagination, SearchInput } from "@/components/ui";
+import { Pagination, SearchInput, Skeleton } from "@/components/ui";
 import { saveScan } from "@/lib/scans/scan-store";
 
 type LoadState = "loading" | "ready" | "error";
@@ -234,9 +234,9 @@ export default function DashboardOverview() {
           </div>
 
           {loadState === "loading" ? (
-            <div
+            <Skeleton
               aria-label="Loading fixtures"
-              className="mt-6 h-28 animate-pulse rounded-xl bg-muted"
+              className="mt-6 h-28 rounded-xl"
             />
           ) : loadState === "error" ? (
             <div

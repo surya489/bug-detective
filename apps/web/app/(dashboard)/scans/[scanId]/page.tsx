@@ -13,20 +13,11 @@ import {
   Radar,
   Sparkles,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, PageSkeleton } from "@/components/ui";
 import FindingCard from "@/components/findings/finding-card";
 import ScanFindingsReport from "@/components/findings/scan-findings-report";
 import { getScanById, subscribeToStore } from "@/lib/scans/scan-store";
 import type { AnalysisResponse } from "@bug-detective/shared-types";
-
-function ScanDetailSkeleton() {
-  return (
-    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-      <div className="h-10 w-48 animate-pulse rounded-lg bg-card" />
-      <div className="h-32 animate-pulse rounded-2xl bg-card" />
-    </main>
-  );
-}
 
 function ScanDetailContent({
   params,
@@ -47,7 +38,7 @@ function ScanDetailContent({
   }, [scanId]);
 
   if (loading) {
-    return <ScanDetailSkeleton />;
+    return <PageSkeleton variant="detail" />;
   }
 
   if (!scan) {
@@ -164,7 +155,7 @@ export default function ScanDetailPage({
   params: Promise<{ scanId: string }>;
 }) {
   return (
-    <Suspense fallback={<ScanDetailSkeleton />}>
+    <Suspense fallback={<PageSkeleton variant="detail" />}>
       <ScanDetailContent params={params} />
     </Suspense>
   );
